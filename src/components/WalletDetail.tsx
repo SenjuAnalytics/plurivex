@@ -3,7 +3,7 @@ import { useApp } from "../context/AppContext";
 import { balanceAmount, chainsForWallet, type Chain } from "../lib/chains";
 import type { WalletView } from "../lib/types";
 import { isSolanaWallet, walletDisplayAddress, walletHasScanTarget } from "../lib/wallet";
-import { IconScan, IconEth } from "./Icons";
+import { IconScan, ChainIcon } from "../icons";
 
 function BalanceCard({ chain, value }: { chain: Chain; value: string | null }) {
   const num = value && value !== "loading" && value !== "error" ? balanceAmount(value) : 0;
@@ -12,11 +12,7 @@ function BalanceCard({ chain, value }: { chain: Chain; value: string | null }) {
   return (
     <div className={`bal-card bal-${chain.key}`} style={{ "--chain-color": chain.color } as React.CSSProperties}>
       <div className="bal-card-top">
-        {chain.key === "eth" ? (
-          <IconEth size={16} />
-        ) : (
-          <span className="bal-card-dot" />
-        )}
+        <ChainIcon chain={chain.key} size={16} />
         <span className="bal-card-name">{chain.label}</span>
       </div>
       <div className={`bal-card-val ${state}`}>
@@ -136,7 +132,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
               <div key={`${tok.chain}-${tok.symbol}-${idx}`} className="token-card">
                 <div className="token-card-top">
                   <span className="token-symbol" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    {(tok.symbol === "WETH" || tok.symbol === "ETH") && <IconEth size={14} />}
+                    <ChainIcon chain={tok.symbol} size={14} />
                     {tok.symbol}
                   </span>
                   <span className={`token-chain-badge chain-${tok.chain}`}>{tok.chain.toUpperCase()}</span>

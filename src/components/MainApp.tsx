@@ -3,7 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { FloatingImport } from "./FloatingImport";
 import { WalletDetail } from "./WalletDetail";
 import { SweepModal } from "./SweepModal";
-import { IconWallet, IconShield, IconScan, IconExport, IconLock } from "./Icons";
+import { IconWallet, IconShield, IconScan, IconExport, IconLock } from "../icons";
 
 export function MainApp() {
   const {

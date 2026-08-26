@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useApp } from "../context/AppContext";
-import { IconShield, IconWallet, IconLock } from "./Icons";
+import { IconShield, IconWallet, IconLock } from "../icons";
 
 function AuthLayout({ children, title, desc }: { children: ReactNode; title: string; desc: string }) {
   return (

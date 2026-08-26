@@ -8,7 +8,7 @@ import {
   type FileScanReport,
   type ReadImportProgress,
 } from "../lib/extract";
-import { IconFolder, IconImport, IconKey, IconSeed, IconUpload } from "./Icons";
+import { IconFolder, IconImport, IconKey, IconSeed, IconUpload } from "../icons";
 
 interface ImportPanelProps {
   floating?: boolean;

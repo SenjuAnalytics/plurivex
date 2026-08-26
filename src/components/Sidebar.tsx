@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { isEvmWallet, isSolanaWallet, shortAddr, walletDisplayAddress } from "../lib/wallet";
 import type { WalletView } from "../lib/types";
-import { IconSearch, IconSeed, IconKey } from "./Icons";
+import { IconSearch, IconSeed, IconKey } from "../icons";
 
 type Filter = "all" | "evm" | "sol" | "funded";
 

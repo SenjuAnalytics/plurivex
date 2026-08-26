@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImportPanel } from "./ImportPanel";
-import { IconImport, IconWalletImport } from "./Icons";
+import { IconImport, IconWalletImport } from "../icons";
 
 const STORAGE_KEY = "floating-import-pos";
 const CHIP_W = 156;
