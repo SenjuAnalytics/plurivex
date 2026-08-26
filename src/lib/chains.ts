@@ -153,7 +153,10 @@ function formatBalance(wei: bigint, symbol: string): string {
   const raw = ethers.utils.formatEther(wei);
   const num = parseFloat(raw);
   if (!Number.isFinite(num) || num === 0) return `0 ${symbol}`;
-  if (num < 0.00001) return `${raw} ${symbol}`;
+  if (num < 0.000001) {
+    const trimmed = num.toFixed(7).replace(/\.?0+$/, "");
+    return `${trimmed === "0" ? "< 0.000001" : trimmed} ${symbol}`;
+  }
   if (num < 1) return `${num.toFixed(6).replace(/\.?0+$/, "")} ${symbol}`;
   return `${num.toFixed(5)} ${symbol}`;
 }
@@ -228,4 +231,15 @@ export function needsScanForWallet(
   type: WalletType,
 ): boolean {
   return chainsForWallet(type).every((c) => !balances[c.key]);
+}
+export function formatCompactBalance(v: string | null | undefined): string {
+  if (!v || v === "error" || v === "loading") return "0";
+  const parts = v.trim().split(" ");
+  const rawNum = parts[0];
+  const symbol = parts[1] || "";
+  const num = parseFloat(rawNum);
+  if (!Number.isFinite(num) || num === 0) return `0 ${symbol}`;
+  if (num < 0.00001) return `< 0.0001 ${symbol}`;
+  if (num < 1) return `${num.toFixed(4).replace(/\.?0+$/, "")} ${symbol}`;
+  return `${num.toFixed(3).replace(/\.?0+$/, "")} ${symbol}`;
 }
