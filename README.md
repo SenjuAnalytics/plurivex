@@ -1,4 +1,4 @@
-# Plurix
+# Plurivex
 
 A local desktop application to inspect, manage, and batch sweep wallets (seed phrases & private keys).
 

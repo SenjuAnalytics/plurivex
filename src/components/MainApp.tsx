@@ -35,7 +35,7 @@ export function MainApp() {
             <IconWallet size={18} />
           </div>
           <div>
-            <div className="app-title">Plurix</div>
+            <div className="app-title">Plurivex</div>
             <div className="app-subtitle">
               <IconShield size={12} />
               Local · Encrypted · Read-only

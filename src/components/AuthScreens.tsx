@@ -10,7 +10,7 @@ function AuthLayout({ children, title, desc }: { children: ReactNode; title: str
         <div className="auth-brand">
           <div className="auth-brand-icon"><IconWallet size={22} /></div>
           <div>
-            <span className="auth-brand-name">Plurix</span>
+            <span className="auth-brand-name">Plurivex</span>
             <span className="auth-brand-tag"><IconShield size={11} /> 100% Local</span>
           </div>
         </div>
