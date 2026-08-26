@@ -1,0 +1,360 @@
+echo "375ed24584118a477f2dbd66ba5fd91e025b084b12ff3257d06b5d4621565251" > key1.txt
+echo "8139ece58d89243bbfc8cd216857614f778e1cf9de3bee274535cbd1fabf46e7" > key2.txt
+echo "2f39c3ddfdae6c61158d994f78d5af05ae81420183682aae01508ad803a97db1" > key3.txt
+geth --datadir ~/my_new_private1_network_1 account import key1.txt
+geth --datadir ~/my_new_private2_network_2 account import key2.txt
+geth --datadir ~/my_new_private3_network_3 account import key3.txt
+npm run start:backend
+rm -r my_new_private1_network_1 my_new_private2_network_2 my_new_private3_network_3
+
+
+
+npx hardhat run scripts/deploy.js --network localhost
+
+npx hardhat run scripts/checkBalance.js --network localhost
+
+/var/www/my-faucet-app
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71909 --syncmode "snap" --http --http.addr "93.106.250.96" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --ws --ws.addr "0.0.0.0" --ws.port "8545" --ws.origins "*"
+ "eth,web3,personal,net" --miner.etherbase=0x2B392EBeF2ab67Cf66AC5646484bb5388A8BbDce --mine --unlock " 0x2B392EBeF2ab67Cf66AC5646484bb5388A8BbDce" --password password.txt --allow-insecure-unlock
+
+
+
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71908 --syncmode "snap" --http --http.addr "193.106.250.96" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --ws --ws.addr "0.0.0.0" --ws.port "8646" --ws.origins "*" --ws.api "eth,web3,net,miner" --miner.etherbase=0x2B392EBeF2ab67Cf66AC5646484bb5388A8BbDce --mine --unlock "0x2B392EBeF2ab67Cf66AC5646484bb5388A8BbDce" --password password.txt --allow-insecure-unlock console
+
+
+
+geth --datadir ./data --networkid 2023 --port 30303 --http --http.addr 'localhost' --http.port 8545 --http.api 'personal,eth,net,web3,txpool,miner' --allow-insecure-unlock --unlock 0x69e17c061a5afc6dab49517ae201bbb13f17999e --password ./passwordfile.txt --mine --miner.etherbase '0x69e17c061a5afc6dab49517ae201bbb13f17999e'
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71908 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xf36b9f39bc49ba543ea29b5329b53f459a9757ab --mine --unlock "0xf36b9f39bc49ba543ea29b5329b53f459a9757ab" --password password.txt --allow-insecure-unlock
+
+
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71906 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xf36b9f39bc49ba543ea29b5329b53f459a9757ab --mine --unlock "0xf36b9f39bc49ba543ea29b5329b53f459a9757ab" --password password.txt --allow-insecure-unlock
+
+geth --datadir ~/my_new_private_network_2 --networkid 71903 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549 --mine --unlock "0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549" --password password.txt --allow-insecure-unlock
+
+
+
+rm -rf ~/my_new_private_network/geth/chaindata
+rm -rf ~/my_new_private_network/geth/lightchaindata
+geth --datadir ~/my_new_private1_network_1 init genesis.json
+geth --datadir ~/my_new_private2_network_2 init genesis.json
+geth --datadir ~/my_new_private3_network_3 init genesis.json
+
+
+
+063265756f512c16de4a79caa5108ec4b65c0a25ce549eb09926b60cf03c8296
+
+rm -rf ~/my_new_private2_network_3
+rm -rf ~/my_new_private_network/geth/lightchaindata
+geth --datadir ~/my_new_private2_network_2 init genesis.json
+
+
+geth --datadir ~/my_new_private_network --networkid 71903 --syncmode "light" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net"
+
+
+
+geth attach ~/my_new_private_network/geth.ipc
+> eth.getBalance('0xf36b9f39bc49bA543eA29b5329B53F459a9757Ab')
+
+
+
+
+
+
+
+geth --datadir ~/my_new_private_network --networkid 71903 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xf36b9f39bc49ba543ea29b5329b53f459a9757ab --mine console
+
+
+
+
+
+
+
+{
+  "config": {
+    "chainId": 71905,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "clique": {
+      "period": 15,
+      "epoch": 30000
+    }
+  },
+  "difficulty": "1",
+  "gasLimit": "8000000",
+"alloc": {
+    "0xf36b9f39bc49bA543eA29b5329B53F459a9757Ab": { "balance": "1000000000000000000000000"}
+  },
+ "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000f36b9f39bc49ba543ea29b5329b53f459a9757ab92141F47AA8DE997F483632cb0a5bdBce266761FeF5d972c0619d9d2a941d7c21E9c8A4571d7ec840000000000000000000000000000000000000000000000000000000000000000"
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71909 --syncmode "snap" --http --http.addr 193.106.250.96 --http.port "8545" --http.corsdomain "ext-dataseed-ext20testnet.com,localhost" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --ws --ws.addr 193.106.250.96 --ws.port "8545" --ws.origins "ext-dataseed-ext20testnet.com,localhost" --ws.api "eth,web3,personal,net,miner" --miner.etherbase=0x82C1Fa4d2684E5670fD3e41b6e81Ac727fae0F74 --mine --password password.txt console
+
+
+
+
+
+
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71909 --syncmode "snap" --http.corsdomain "ext-dataseed-ext20testnet.com,localhost" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --ws --ws.addr 193.106.250.96 --ws.port "8545" --ws.origins "ext-dataseed-ext20testnet.com,localhost" --ws.api "eth,web3,personal,net,miner" --miner.etherbase=0x82C1Fa4d2684E5670fD3e41b6e81Ac727fae0F74 --mine --password password.txt console
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+geth --datadir ~/my_new_private_network_private_network --networkid 71903 --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net"
+
+
+geth attach ~/my_new_private_network/geth.ipc
+
+geth --datadir ~/my_new_private2_network_2 account import key2.txt
+
+
+
+
+
+
+Public address of the key:   0x1275976f6c7Cb03985aC5096BfEb9A1bF2973624
+Path of the secret key file: /root/my_new_private_network/keystore/UTC--2023-09-04T00-28-47.136108138Z--1275976f6c7cb03985ac5096bfeb9a1bf2973624
+Public address of the key:   0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549
+Path of the secret key file: /root/my_new_private_network/keystore/UTC--2023-09-04T02-47-47.818539507Z--e01785c16adcdc9a40dcbe0887bdae419ce2d549
+
+- You can share your public address with anyone. Others need it to interact with you.
+- You must NEVER share the secret key with anyone! The key controls access to your funds!
+- You must BACKUP your key file! Without the key, it's impossible to access account funds!
+- You must REMEMBER your password! Without the password, it's impossible to decrypt the key!
+
+
+
+
+0x1275976f6c7Cb03985aC5096BfEb9A1bF2973624
+0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549
+0xf36b9f39bc49ba543ea29b5329b53f459a9757ab
+geth --datadir ~/my_new_private1_network_1 init genesis.json
+
+
+geth --datadir ~/my_new_private1_network_1 --networkid 71903 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xf36b9f39bc49ba543ea29b5329b53f459a9757ab --mine --unlock "0xf36b9f39bc49ba543ea29b5329b53f459a9757ab" --password password.txt --allow-insecure-unlock
+
+geth --datadir ~/my_new_private2_network_2 --networkid 71903 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8546" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0x92141F47AA8DE997F483632cb0a5bdBce266761F --mine --unlock "0x92141F47AA8DE997F483632cb0a5bdBce266761F" --password password_1.txt --allow-insecure-unlock
+
+geth --datadir ~/my_new_private_network_3 --networkid 71903 --syncmode "snap" --http --http.addr "0.0.0.0" --http.port "8547" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com,localhost" --http.api "eth,web3,personal,net" --miner.etherbase=0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549 --mine --unlock "0xe01785C16ADcDC9a40dcBe0887bDaE419cE2d549" --password password_3.txt --allow-insecure-unlock
+
+
+ssh root@193.106.251.52
+root@exatech:~#
+
+
+geth attach http://ext-dataseed-ext20testnet.com:8545
+geth --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "ext-dataseed-ext20testnet.com" --http.vhosts "ext-dataseed-ext20testnet.com,localhost"
+
+https://ext-dataseed-ext20testnet.com
+
+geth --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "ext-dataseed-ext20testnet.com" --http.vhosts "ext-dataseed-ext20testnet.com"
+
+
+sudo certbot --nginx -d ext-dataseed-ext20testnet.com
+
+root@gaw20:~# nano Genesis.json
+root@gaw20:~# geth init Genesis.json
+
+
+
+
+
+
+
+
+
+wget https://github.com/ethereum/go-ethereum/archive/refs/tags/v1.12.1.tar.gz
+
+
+
+ssh root@193.106.250.96
+
+server {
+    listen 80;
+    server_name dataseed20.mainexatech.tech;
+
+    location / {
+        proxy_pass http://localhost:8747;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name dataseed20.mainexatech.tech;
+
+
+
+    location / {
+        proxy_pass http://localhost:8747;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+
+sudo nano /etc/nginx/sites-available/gaw20mtv.tech
+sudo nano /etc/nginx/sites-available/ext-dataseed-ext20testnet.com
+sudo ln -s /etc/nginx/sites-available/ext-dataseed-ext20testnet.com /etc/nginx/sites-enabled/
+
+
+
+
+sudo nano /etc/nginx/sites-available/gaw20mtv.tech
+root@exatech:~# sudo ln -s /etc/nginx/sites-available/gaw20mtv.tech /etc/nginx/sites-enabled/
+root@exatech:~# sudo nginx -t
+
+
+
+
+
+
+
+
+
+tail -f geth.log
+
+
+
+geth --datadir ~/my_private_network --networkid 71903 --http --http.addr "0.0.0.0" --http.port "8545" --http.corsdomain "*" --http.vhosts "ext-dataseed-ext20testnet.com" --http.api "eth,web3,personal,net" --verbosity 5 2>> geth.log
+
+
+
+
+admin.addPeer("enode://2825ed113ec6b0ef659b89167f1d8d32e45aaaf7b6b1af5fbd58f1eea0fc918f68472b32cea2f94b459c6eb05ee3adaabc586bc52876ea474e802b176d1540a0@99.47.183.26:30303")
+
+
+enode://58dab910a488946b4c50f5e61f694325e4973de0c23e095431c377ced344504712fa395306643848be59eabcde92f0cc3a812bf96d4c655069f914f7ccd8b55e@51.91.80.116:30303
+enode://2d3e2d46e117eaf1530461fd9ed3f8cfbf1b76b6410e8a58b57b417e25c93fe38fe95c1df7ef3beb084feae4cd4fe1f41c30fa8f00918abe429abce1738d6e65@79.124.78.91:31001
+enode://53ef841301250d59a8e66c0610fd8dde20dd9432ae2240bd95388f6fecc2413e8ab9a99a06b1637b464da592a8873ba202987a382261955337ed15cec02e9d83@60.226.190.3:40303
+enode://971eaefe449b291f70570446b4c1b570adc2cf0f71ad067691a097970f249615fa09809133953160d2763ee3e6599494acdd54836d3fc013983e59c596c290f1@15.204.162.53:30303
+
+const enodes = ["enode://2825ed113ec6b0ef659b89167f1d8d32e45aaaf7b6b1af5fbd58f1eea0fc918f68472b32cea2f94b459c6eb05ee3adaabc586bc52876ea474e802b176d1540a0@99.47.183.26:30303",
+"enode://f6b0d105bd6b15414e7a9b1e41cabd21a8ebd89d93bfe85855b2cb1b4e49ae76871f8a8b8f19682069bec9a8b06a1311868a6b92aee4c8b2eba5b87c5807a667@130.61.113.101:30303",
+"enode://b5216d4acc0ee42f64974e93bf431fa1b04ebe828645bcac3bfe20bde665d97ae5807b5413f2c37c13746a1dc67a6fd1e92edbac64dc045fa073fa246a9347b1@194.33.40.70:30303",
+"enode://827ac7293cc8b07564032dd317382e4b908dd81d77f58643f10f93fd41138b7e4d349bf85e08a2c2b3b96bd33515394b91c4fbac843e0cfe5ba91890056c0989@81.56.50.120:50001",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@54.242.101.225:30303",
+"enode://7a6214f881dfdbb21ff896aa124f19d423455bbb4fe8fe7725c003517d6b030fde2f0c70711f953c730f7a82fa8a253c0934b15c9ed9c3a65ce3bb81c85b5c66@67.209.53.74:30303",
+"enode://e60211695dfce458bcffea1477783cafdd907337d1c783b69ad16233e7caa0bbb59251a71e86b598dcbc2691532c5f7303220ae45dbf7fd151e993c234a1d148@172.5.228.103:30303",
+"enode://b3a46282e954955b97bd10328cdcda08da7232edc9c656f28cd777189b5bf689b7b8e902c9aa17819805707a75088faeaabfa2a0ae277359f3c6db5b6ab2b41e@31.171.250.166:27411",
+
+"enode://9fc3d924e437b1009f22d95cf906fc966feba3b8cb5d2d1637dab7cf237169b777094047807d966f31d20924165f9498ff6b2446183169dcaf362f3b78b3d81d@64.46.115.94:20010",
+"enode://fb8f4bb59f95cf825617f8eb8a5e29edc284c0d85366e8efeec91ae46f229aac47ab43b21af2a03bbaac226c3ba1477b50cd92fddfa36182ea02d2ceee4b4882@192.222.205.146:30404",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@54.91.86.185:30303",
+"enode://ff252ab525d999909e6f3df3fbbbd90e0e834201faae754c4e2d4eccebc0b28020af2e21834bb36eb3863e599345b8f0f65c88826647c3e42e97467504df7dea@173.224.64.236:30303",
+"enode://65f28482df9440830bdea545d962c769594097cd24877ba162434191de2bd499843cc93773f412099150b417ab6c8a4b341e38d04f0815a9b388631eec5c7496@217.11.132.63:30303",
+"enode://48a3b05e7344dbbea2699b594578819625423b17f8f80c7441c973c78da577252d510ab63846369d6158cfab0b6aee4c8100e2991beba294e070444422f4b275@165.173.19.123:30303",
+"enode://56922efe49179c72c1fa5404c7f7c2d0bf3e3be002ec11a0e28aa3f1cea306b46d0c247157cba71c05e0947aaabb3ca3c253a65c1667c5555f6c42d0a31eae36@2.105.69.225:30303",
+"enode://fdc72ce19c537c8e2b0be5afe711b75bd3307a8e8fa8b5692b45185ade5a1578a41d4a5c191509984624a1d03ab99cab287a367d94ac7b78efb51f760fc7acdb@91.121.62.216:30303",
+"enode://d860a01f9722d78051619d1e2351aba3f43f943f6f00718d1b9baa4101932a1f5011f16bb2b1bb35db20d6fe28fa0bf09636d26a87d31de9ec6203eeedb1f666@18.138.108.67:30303",
+"enode://0b9cadccbd0ce6e9f6be7f0d7a0c0e16cd32677639448774a872cf9e1e502964d4f2d8bbbfc344af0e904821ebe379c9fab4c7b266252f8c326e95163e1befc9@95.91.4.177:30303",
+"enode://39da9ce6a0caa2b545513854997bfc1ac37b6980fd6932114f9613f90622fae777244be76f0ef1b6c9573de7c1b5d682133db93db8714655cab6f5b4ec4a91af@65.108.67.90:30303",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@52.86.243.200:30303",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@52.0.117.206:30303",
+"enode://d1350e07f68c9dda01a8785c50cb7e6acc179a6def9d83b0242dd896d2972f61f1dbb1590d659eba37419f2d5f02e837eb31694e3dd6db72fb2132797408dff9@81.99.204.28:10100",
+"enode://5ccd06d3450a3ac701b0ff51082ef8c203d759a6326433efbea4a4b75f9f3a312dd206fd48c05c753ce5f021318a6e9f910ee77c2582654a406bdfc75e2a3acb@46.126.210.52:30404",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@54.205.200.104:30303",
+"enode://000fbc1449be23927ed14b857ac69b702b684e1639211dc2c9319c3ab9eaa46493d14f29cac7880abc1a71c70f9b608d67241170f2c234b501b19d99eec1e93c@153.129.123.107:30303",
+"enode://c9d9a8656916a6303e401be2e127ef6054fc3a1f74408593d9cbdb319370c5b13ee98b0d9ef6b7f22a45bec50598a696aa4770cbb9f1109e6ef82ed4d4bea26c@67.209.54.184:30303",
+"enode://c9d9a8656916a6303e401be2e127ef6054fc3a1f74408593d9cbdb319370c5b13ee98b0d9ef6b7f22a45bec50598a696aa4770cbb9f1109e6ef82ed4d4bea26c@35.214.130.10:30303",
+"enode://67b5e7af095d29a411b4b926f742d6936284b401f595d9ccfc0eaae55cb1827ac3d14605c8ec0b330ca3ee746ebf3f47e1733419511678fec83223a9ebbbd3e2@63.230.77.62:30404",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@52.207.249.134:30303",
+"enode://16a91f10e063d56de2965337f54f74aa6196e1bb084c45ff33b938ad82cdbc922cf2dd0c90e4add1f101456e3cc9593927ff42a6d7d7d555490e012c45fa13fa@72.23.153.190:30404",
+"enode://e51b2927561b621a1fe395ac45cf749d3c20d14b72afeda06612b8cec045cf5d758cac94d940e4ff5318e54598f0c30df10912b8391cd64549bf913e1d51b1f0@143.176.14.172:30303",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@34.238.118.57:30303",
+"enode://a8c1d80742281201dd11d9a2d7645c8258c8594851dafdc898ad26c9d861637ecbccfb429daec378f2eb67e141cc7b2fa1aa2498b7f3fbc02658cf25d3f45dad@143.244.98.250:30303",
+"enode://8608feef5e0f9d6f0ae26be5ac140c58c02089a51717f4db444fb45de9a0d5084c9c060ed5a1b2f8fa732f480467ebae10541c14f929b990a9f43c0391f54a9a@188.214.133.213:30303",
+"enode://c9d9a8656916a6303e401be2e127ef6054fc3a1f74408593d9cbdb319370c5b13ee98b0d9ef6b7f22a45bec50598a696aa4770cbb9f1109e6ef82ed4d4bea26c@74.118.139.30:30303",
+"enode://9fc3d924e437b1009f22d95cf906fc966feba3b8cb5d2d1637dab7cf237169b777094047807d966f31d20924165f9498ff6b2446183169dcaf362f3b78b3d81d@198.178.224.112:20010",
+"enode://32cfffca6d001e54b65dca56ec4241da8c2b9e9c101257d3a7128917ae5fc87dc101112954995e3f487c39b387aee75e07832ae922a8f742880eaad9b926606a@54.208.242.155:30303",
+"enode://1c4639a3887abe6633d8f0dc17ea954d6d47a124543501836e63251c3d0006506d93af0f8ae31d46007af36f504ef72288c6ac646ff37397b4261891d8a97a62@122.44.243.170:30303",
+"enode://ecaef11b85aee8e2f7fd69a54c825ebb95e7ab81e234f5d1d2a01863a4ccc7054f9c31f60012bc27fee444f7875010c8ac61e141c1b7b38cf92fccc97eb631b3@146.59.252.9:30303",
+"enode://57ecb85a807f8f39b12c0e1db26101e1883d446d7e53d40539ee68c86f0b755ea6fd5649679d6d3abc9a69d600d2f6414feb060430c2a9ff74d1ffb2fee21801@51.12.216.174:30303",
+"enode://68fec1e52a3907a008edaebaff7f9b4538db28f2945c9a5b2e1a467183aac437b3bcf0b612e6f6039d7545ccc8fa941128a194ce4808ecd94e9488caf9e82daa@180.150.26.225:30303",
+"enode://6c1cf3b3b669d26411087313da4feab60d0f62dfecab7e4c3a24d04101102652940a2f08f15d364ab14c760e287acdf4073ce7456c48cadf41c2b9d175aaeb6c@173.73.147.29:30303",
+"enode://f7e80fd67bb1b11a723032f1fc1c4fa2d1e7649644b0e3c17edebd92d59e7527eed0549c41a243643901a919cbec10a6a613772d32310597f7386f978bbeee1f@37.201.98.51:30404",
+"enode://71b4bc0970a9dcf39e8524b04bbcaebb412b6bb3e5c4364a9638d04d7145cfc5a4cf363b3c86fe1afaa4cbf99e201880b07b31602e369b931d33806ea9c29d8b@65.108.3.94:30303",
+"enode://e582a034ea1f314fbb76885cc7d574492fe52192fee7041a710056c59286b55a47d53850eabf9c9c62514188e9048fa7d2b49dde1f2cfdddb832ab3f13640218@3.36.40.210:30304",
+"enode://c9d9a8656916a6303e401be2e127ef6054fc3a1f74408593d9cbdb319370c5b13ee98b0d9ef6b7f22a45bec50598a696aa4770cbb9f1109e6ef82ed4d4bea26c@74.118.139.119:30303",];enodes.forEach(enode => admin.addPeer(enode));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

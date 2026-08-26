@@ -1,0 +1,27 @@
+[package]
+name = "wallet-inspector"
+version = "0.1.0"
+description = "Local wallet inspector desktop app"
+authors = ["shole"]
+edition = "2021"
+
+[lib]
+name = "wallet_inspector_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+futures = "0.3"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
+

@@ -1,0 +1,18 @@
+[[permission]]
+identifier = "allow-rpc-get-balance"
+description = "Allow fetching wallet balance via blockchain RPC"
+commands.allow = ["rpc_get_balance", "rpc_get_sol_balance"]
+
+[[permission]]
+identifier = "allow-scan-balances"
+description = "Allow scanning and saving wallet balances"
+commands.allow = ["scan_balances"]
+
+[[permission]]
+identifier = "allow-sweep-commands"
+description = "Allow fetching sweep estimates and broadcasting transactions"
+commands.allow = [
+  "get_chain_fee_data",
+  "get_account_nonce_and_balance",
+  "broadcast_raw_tx"
+]
