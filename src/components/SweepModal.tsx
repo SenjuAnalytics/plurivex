@@ -10,6 +10,7 @@ import {
 } from "../lib/sweeper";
 import { shortAddr } from "../lib/wallet";
 import { ethers } from "ethers";
+import { IconEth } from "./Icons";
 
 export function SweepModal() {
   const {
@@ -200,7 +201,10 @@ export function SweepModal() {
                   className={`sweep-chain-btn ${chainKey === c.key ? "active" : ""}`}
                   onClick={() => !sweeping && setChainKey(c.key)}
                 >
-                  <span className="chain-badge">{c.symbol}</span>
+                  <span className="chain-badge" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    {c.key === "eth" && <IconEth size={14} />}
+                    {c.symbol}
+                  </span>
                   <span className="chain-name">{c.name}</span>
                 </button>
               ))}
