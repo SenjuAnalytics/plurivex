@@ -2767,6 +2767,20 @@ textarea::-moz-focus-inner {
   color: #ffffff;
 }
 
+.batch-action-btn.btn-clear-selection {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  font-weight: 700;
+}
+
+.batch-action-btn.btn-clear-selection:hover {
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+}
+
 .batch-sweep-btn {
   font-size: 11px;
   font-weight: 700;
@@ -3728,12 +3742,10 @@ textarea::-moz-focus-inner {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4) !important;
 }
 
-.filter-tab.funded-tab {
-  color: #34d399 !important;
-}
 .filter-tab.funded-tab.active {
-  background: rgba(16, 185, 129, 0.18) !important;
+  background: rgba(16, 185, 129, 0.2) !important;
   color: #34d399 !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* ── 2-Line Wallet Items ── */

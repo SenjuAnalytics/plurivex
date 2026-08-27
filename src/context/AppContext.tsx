@@ -144,7 +144,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       matching = matching.filter((w) => isEvmWallet(w.type));
     }
     const fundedIds = matching.map((w) => w.id);
-    setSelectedSweepIds(new Set(fundedIds));
+    setSelectedSweepIds((prev) => {
+      const allSelected = fundedIds.length > 0 && fundedIds.every((id) => prev.has(id));
+      if (allSelected) {
+        return new Set();
+      }
+      return new Set(fundedIds);
+    });
   }, [wallets]);
 
   const clearSweepSelection = useCallback(() => {

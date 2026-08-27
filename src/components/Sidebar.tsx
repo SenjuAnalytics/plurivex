@@ -267,15 +267,29 @@ export function Sidebar() {
         </div>
 
         {/* Batch Selection Toolbar */}
-        {fundedCount > 0 && (
+        {(fundedCount > 0 || selectedSweepIds.size > 0) && (
           <div className="sidebar-batch-bar">
-            <button
-              type="button"
-              className="batch-action-btn"
-              onClick={() => (isAllFundedSelected ? clearSweepSelection() : selectAllFunded(filter === "evm" ? "evm" : filter === "sol" ? "sol" : "all"))}
-            >
-              {isAllFundedSelected ? "✕ Deselect All" : `☑️ Select All Funded (${activeScopeFundedCount})`}
-            </button>
+            {fundedCount > 0 && (
+              <button
+                type="button"
+                className="batch-action-btn"
+                onClick={() => selectAllFunded(filter === "evm" ? "evm" : filter === "sol" ? "sol" : "all")}
+                title={isAllFundedSelected ? "Deselect all funded wallets" : "Select all funded wallets"}
+              >
+                {isAllFundedSelected ? "✕ Deselect Funded" : `☑️ Select All Funded (${activeScopeFundedCount})`}
+              </button>
+            )}
+
+            {selectedSweepIds.size > 0 && (
+              <button
+                type="button"
+                className="batch-action-btn btn-clear-selection"
+                onClick={clearSweepSelection}
+                title="Clear all checked checkboxes"
+              >
+                ✕ Clear ({selectedSweepIds.size})
+              </button>
+            )}
           </div>
         )}
       </div>
