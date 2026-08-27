@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImportPanel } from "./ImportPanel";
-import { IconImport, IconWalletImport } from "../icons";
+import { IconWalletImport } from "../icons";
 
 const STORAGE_KEY = "floating-import-pos";
-const CHIP_W = 156;
-const CHIP_H = 52;
 const PANEL_W = 640;
 const PANEL_H = 480;
 const DRAG_THRESHOLD = 5;
 
 function defaultPos() {
   return {
-    x: Math.max(16, window.innerWidth - CHIP_W - 28),
-    y: Math.max(16, window.innerHeight - CHIP_H - 28),
+    x: Math.max(16, Math.round((window.innerWidth - PANEL_W) / 2)),
+    y: Math.max(30, Math.round((window.innerHeight - PANEL_H) / 2)),
   };
 }
 
@@ -23,7 +21,7 @@ function loadPos(): { x: number; y: number } {
     if (raw) {
       const p = JSON.parse(raw) as { x: number; y: number };
       if (typeof p.x === "number" && typeof p.y === "number") {
-        return clampPos(p.x, p.y, CHIP_W, CHIP_H);
+        return clampPos(p.x, p.y, PANEL_W, PANEL_H);
       }
     }
   } catch {
@@ -42,10 +40,13 @@ function clampPos(x: number, y: number, width: number, height: number) {
   };
 }
 
-export function FloatingImport() {
-  const [open, setOpen] = useState(false);
+interface FloatingImportProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function FloatingImport({ open, onClose }: FloatingImportProps) {
   const [pos, setPos] = useState(loadPos);
-  const openRef = useRef(open);
   const drag = useRef({
     active: false,
     moved: false,
@@ -53,20 +54,16 @@ export function FloatingImport() {
     startY: 0,
     origX: 0,
     origY: 0,
-    width: CHIP_W,
-    height: CHIP_H,
+    width: PANEL_W,
+    height: PANEL_H,
   });
   const dragHandlers = useRef({
     onMove: (_e: PointerEvent) => {},
     onUp: () => {},
   });
 
-  openRef.current = open;
-
-  const size = open ? { w: PANEL_W, h: PANEL_H } : { w: CHIP_W, h: CHIP_H };
-
   useEffect(() => {
-    setPos((p) => clampPos(p.x, p.y, size.w, size.h));
+    setPos((p) => clampPos(p.x, p.y, PANEL_W, PANEL_H));
   }, []);
 
   useEffect(() => {
@@ -75,8 +72,7 @@ export function FloatingImport() {
 
   useEffect(() => {
     const onResize = () => {
-      const s = openRef.current ? { w: PANEL_W, h: PANEL_H } : { w: CHIP_W, h: CHIP_H };
-      setPos((p) => clampPos(p.x, p.y, s.w, s.h));
+      setPos((p) => clampPos(p.x, p.y, PANEL_W, PANEL_H));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -99,12 +95,9 @@ export function FloatingImport() {
     };
 
     const onUp = () => {
-      if (!drag.current.active) return;
-      const wasClick = !drag.current.moved && !openRef.current;
       drag.current.active = false;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      if (wasClick) setOpen(true);
     };
 
     dragHandlers.current = { onMove, onUp };
@@ -131,57 +124,37 @@ export function FloatingImport() {
     window.addEventListener("pointerup", dragHandlers.current.onUp);
   };
 
-  const close = () => setOpen(false);
+  if (!open) return null;
 
   const ui = (
     <div
-      className={`floating-import${open ? " is-open" : ""}`}
-      style={{ left: pos.x, top: pos.y }}
+      className="floating-import is-open"
+      style={{ left: pos.x, top: pos.y, zIndex: 99999 }}
     >
-      {!open ? (
-        <button
-          type="button"
-          className="floating-import-chip"
-          aria-label="Import wallet"
-          onPointerDown={(e) => startDrag(e, { w: CHIP_W, h: CHIP_H })}
+      <div className="floating-import-panel">
+        <header
+          className="floating-import-header"
+          onPointerDown={(e) => startDrag(e, { w: PANEL_W, h: PANEL_H })}
         >
-          <span className="floating-import-chip-icon">
-            <IconWalletImport size={22} />
+          <span className="floating-import-header-icon">
+            <IconWalletImport size={20} />
           </span>
-          <span className="floating-import-chip-text">
-            <span className="floating-import-chip-title">Import</span>
-            <span className="floating-import-chip-sub">Wallet</span>
-          </span>
-          <span className="floating-import-chip-action" aria-hidden>
-            <IconImport size={14} />
-          </span>
-        </button>
-      ) : (
-        <div className="floating-import-panel">
-          <header
-            className="floating-import-header"
-            onPointerDown={(e) => startDrag(e, { w: PANEL_W, h: PANEL_H })}
+          <div className="floating-import-header-copy">
+            <h3>Import Wallets</h3>
+            <p>Paste, drop files, or import raw text</p>
+          </div>
+          <button
+            type="button"
+            className="floating-import-close"
+            aria-label="Close import"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onClose}
           >
-            <span className="floating-import-header-icon">
-              <IconWalletImport size={20} />
-            </span>
-            <div className="floating-import-header-copy">
-              <h3>Import Wallets</h3>
-              <p>Paste, drop files, or import raw text</p>
-            </div>
-            <button
-              type="button"
-              className="floating-import-close"
-              aria-label="Close import"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={close}
-            >
-              ×
-            </button>
-          </header>
-          <ImportPanel floating onClose={close} />
-        </div>
-      )}
+            ×
+          </button>
+        </header>
+        <ImportPanel floating onClose={onClose} />
+      </div>
     </div>
   );
 

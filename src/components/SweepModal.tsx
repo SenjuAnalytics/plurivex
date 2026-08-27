@@ -34,7 +34,12 @@ export function SweepModal() {
   const [txResults, setTxResults] = useState<Record<number, SweepTxResult>>({});
 
   const activeChain = SWEEP_CHAINS[chainKey] || SWEEP_CHAINS.eth;
-  const selectedWallets = wallets.filter((w) => selectedSweepIds.has(w.id));
+  const selectedWallets =
+    selectedSweepIds.size > 0
+      ? wallets.filter((w) => selectedSweepIds.has(w.id))
+      : wallets.filter((w) => w.hasFunds).length > 0
+        ? wallets.filter((w) => w.hasFunds)
+        : wallets;
 
   // Load live fee data when chain changes
   useEffect(() => {

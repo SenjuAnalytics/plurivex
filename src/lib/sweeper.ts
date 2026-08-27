@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
+import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { deriveEvmWallet } from "./wallet";
 
@@ -14,31 +16,38 @@ export interface SweepChainConfig {
 export const SWEEP_CHAINS: Record<string, SweepChainConfig> = {
   eth: {
     key: "eth",
-    name: "Ethereum Mainnet (L1)",
+    name: "Ethereum",
     symbol: "ETH",
     chainId: 1,
     explorerUrl: "https://etherscan.io/tx/",
   },
   bsc: {
     key: "bsc",
-    name: "BNB Smart Chain (BSC)",
+    name: "BNB Chain",
     symbol: "BNB",
     chainId: 56,
     explorerUrl: "https://bscscan.com/tx/",
   },
   base: {
     key: "base",
-    name: "Base (Layer 2)",
+    name: "Base",
     symbol: "ETH",
     chainId: 8453,
     explorerUrl: "https://basescan.org/tx/",
   },
   arb: {
     key: "arb",
-    name: "Arbitrum One (Layer 2)",
+    name: "Arbitrum",
     symbol: "ETH",
     chainId: 42161,
     explorerUrl: "https://arbiscan.io/tx/",
+  },
+  sol: {
+    key: "sol",
+    name: "Solana",
+    symbol: "SOL",
+    chainId: 101,
+    explorerUrl: "https://solscan.io/tx/",
   },
 };
 
@@ -97,6 +106,68 @@ export async function estimateWalletSweep(
 ): Promise<WalletSweepEstimate> {
   const cfg = SWEEP_CHAINS[chainKey] || SWEEP_CHAINS.eth;
 
+  // 1. Solana Balance and Fee Estimation
+  if (chainKey === "sol") {
+    const feeLamports = 5000n;
+    const feeFormatted = "0.000005 SOL";
+
+    try {
+      const acc = await invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
+        chainKey,
+        address,
+      });
+
+      const lamports = BigInt(acc.balance_hex);
+      const balanceFormatted = acc.balance_formatted;
+
+      if (lamports <= feeLamports) {
+        return {
+          walletId,
+          address,
+          balanceWei: ethers.BigNumber.from(0),
+          balanceFormatted,
+          feeWei: ethers.BigNumber.from(0),
+          feeFormatted,
+          netWei: ethers.BigNumber.from(0),
+          netFormatted: "0.000000 SOL",
+          isSweepable: false,
+          statusText: "Balance < Gas Fee (Dust)",
+        };
+      }
+
+      const netLamports = lamports - feeLamports;
+      const netSol = Number(netLamports) / 1e9;
+      const netFormatted = `${netSol.toFixed(6)} SOL`;
+
+      return {
+        walletId,
+        address,
+        balanceWei: ethers.BigNumber.from(lamports.toString()),
+        balanceFormatted,
+        feeWei: ethers.BigNumber.from(feeLamports.toString()),
+        feeFormatted,
+        netWei: ethers.BigNumber.from(netLamports.toString()),
+        netFormatted,
+        isSweepable: true,
+        statusText: "Ready to Sweep ✓",
+      };
+    } catch (err) {
+      return {
+        walletId,
+        address,
+        balanceWei: ethers.BigNumber.from(0),
+        balanceFormatted: "0 SOL",
+        feeWei: ethers.BigNumber.from(0),
+        feeFormatted,
+        netWei: ethers.BigNumber.from(0),
+        netFormatted: "0 SOL",
+        isSweepable: false,
+        statusText: `Failed to read balance: ${String(err)}`,
+      };
+    }
+  }
+
+  // 2. EVM Balance and Fee Estimation
   const gasPriceWei = ethers.utils.parseUnits(gasPriceGwei.toString(), "gwei");
   const feeWei = gasPriceWei.mul(21000);
   const feeFormatted = `${Number(ethers.utils.formatEther(feeWei)).toFixed(8)} ${cfg.symbol}`;
@@ -175,6 +246,89 @@ export async function executeSweepSingle(
   customGasPriceGwei?: number,
 ): Promise<SweepTxResult> {
   const cfg = SWEEP_CHAINS[chainKey] || SWEEP_CHAINS.eth;
+
+  // 1. Solana Sweep Execution
+  if (chainKey === "sol") {
+    try {
+      const trimmed = secret.trim();
+      const bytes = bs58.decode(trimmed);
+      let keypair: Keypair;
+      if (bytes.length === 64) {
+        keypair = Keypair.fromSecretKey(bytes);
+      } else if (bytes.length === 32) {
+        keypair = Keypair.fromSeed(bytes);
+      } else {
+        return {
+          walletId,
+          address: recipientAddress,
+          success: false,
+          error: "Invalid Solana secret key length",
+        };
+      }
+
+      const fromAddress = keypair.publicKey.toBase58();
+      const toPublicKey = new PublicKey(recipientAddress.trim());
+
+      const acc = await invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
+        chainKey: "sol",
+        address: fromAddress,
+      });
+      const recentBlockhash = await invoke<string>("get_solana_recent_blockhash");
+
+      const lamports = BigInt(acc.balance_hex);
+      const feeLamports = 5000n;
+
+      if (lamports <= feeLamports) {
+        return {
+          walletId,
+          address: fromAddress,
+          success: false,
+          error: "Insufficient SOL for network transaction fee (0.000005 SOL)",
+        };
+      }
+
+      const lamportsToSend = Number(lamports - feeLamports);
+
+      const transaction = new Transaction();
+      transaction.feePayer = keypair.publicKey;
+      transaction.recentBlockhash = recentBlockhash;
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: keypair.publicKey,
+          toPubkey: toPublicKey,
+          lamports: lamportsToSend,
+        })
+      );
+
+      transaction.sign(keypair);
+      const serialized = transaction.serialize();
+      const rawTxBase64 = btoa(String.fromCharCode(...new Uint8Array(serialized)));
+
+      const txHash = await invoke<string>("broadcast_solana_tx", {
+        rawTxBase64,
+      });
+
+      const amountSent = `${(lamportsToSend / 1e9).toFixed(6)} SOL`;
+
+      return {
+        walletId,
+        address: fromAddress,
+        success: true,
+        txHash,
+        explorerUrl: `${cfg.explorerUrl}${txHash}`,
+        amountSent,
+      };
+    } catch (err) {
+      return {
+        walletId,
+        address: recipientAddress,
+        success: false,
+        error: String(err),
+      };
+    }
+  }
+
+  // 2. EVM Sweep Execution
   const signer = deriveEvmWallet(secret, walletType);
 
   if (!signer) {
@@ -189,13 +343,11 @@ export async function executeSweepSingle(
   const fromAddress = signer.address;
 
   try {
-    const [acc, feeData] = await Promise.all([
-      invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
-        chainKey,
-        address: fromAddress,
-      }),
-      invoke<ChainFeeRaw>("get_chain_fee_data", { chainKey }),
-    ]);
+    const acc = await invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
+      chainKey,
+      address: fromAddress,
+    });
+    const feeData = await invoke<ChainFeeRaw>("get_chain_fee_data", { chainKey });
 
     const gasPrice = customGasPriceGwei
       ? ethers.utils.parseUnits(customGasPriceGwei.toString(), "gwei")

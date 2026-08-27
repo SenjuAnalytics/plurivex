@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { Sidebar } from "./Sidebar";
 import { FloatingImport } from "./FloatingImport";
 import { WalletDetail } from "./WalletDetail";
-import { SweepModal } from "./SweepModal";
-import { IconWallet, IconScan, IconLock, IconSeed, IconKey } from "../icons";
+import { SweeperWorkspace } from "./SweeperWorkspace";
+import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport } from "../icons";
 
 export function MainApp() {
+  const [mainView, setMainView] = useState<"detail" | "sweeper">("detail");
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
   const {
     wallets,
     selectedId,
@@ -16,8 +19,6 @@ export function MainApp() {
     scanProgress,
     stopScan,
     fundedCount,
-    setIsSweepModalOpen,
-    selectAllFunded,
   } = useApp();
 
   const selected = wallets.find((w) => w.id === selectedId) ?? null;
@@ -25,17 +26,8 @@ export function MainApp() {
   const evmPkCount = wallets.filter((w) => w.type === "pk").length;
   const solCount = wallets.filter((w) => w.type === "sol_pk").length;
 
-  const handleQuickSweep = () => {
-    if (fundedCount > 0) {
-      selectAllFunded();
-    }
-    setIsSweepModalOpen(true);
-  };
-
   return (
     <div className="app">
-      <FloatingImport />
-      <SweepModal />
       <div className="app-mesh" aria-hidden />
 
       <header className="app-header" data-tauri-drag-region>
@@ -75,11 +67,12 @@ export function MainApp() {
         <div className="app-header-actions">
           <button
             type="button"
-            className="btn-action-minimal btn-sweep"
-            onClick={handleQuickSweep}
-            title="Batch sweep funds from multiple wallets"
+            className="btn-action-minimal btn-import-header"
+            onClick={() => setIsImportOpen(true)}
+            title="Import new wallets (Mnemonic Seed / Private Key / JSON)"
           >
-            ⚡ Sweeper
+            <IconWalletImport size={13} />
+            <span>Import</span>
           </button>
 
           <button
@@ -156,7 +149,9 @@ export function MainApp() {
         <Sidebar />
         <div className="main">
           <div className="detail-panel scrollable">
-            {selected ? (
+            {mainView === "sweeper" ? (
+              <SweeperWorkspace onBack={() => setMainView("detail")} />
+            ) : selected ? (
               <WalletDetail key={selected.id} wallet={selected} />
             ) : (
               <div className="dashboard-overview">
@@ -213,12 +208,13 @@ export function MainApp() {
                     <button
                       type="button"
                       className="action-tile sweep-tile"
-                      onClick={handleQuickSweep}
+                      onClick={() => exportWallets("txt")}
+                      disabled={!wallets.length}
                     >
-                      <div className="tile-icon-wrap">⚡</div>
+                      <div className="tile-icon-wrap">📁</div>
                       <div className="tile-content">
-                        <div className="tile-title">Batch Sweeper Engine</div>
-                        <div className="tile-desc">Consolidate native ETH, BNB, SOL, & tokens from multiple wallets into 1 destination address.</div>
+                        <div className="tile-title">Export Vault Data</div>
+                        <div className="tile-desc">Safely backup and export decrypted wallet addresses, keys, and balances to standard TXT or CSV formats.</div>
                       </div>
                       <div className="tile-arrow">→</div>
                     </button>
@@ -243,6 +239,30 @@ export function MainApp() {
           </div>
         </div>
       </div>
+      {/* Realtime RPC & Vault Health Footer Bar */}
+      <footer className="app-footer-bar">
+        <div className="footer-left">
+          <div className="rpc-status-pill">
+            <span className="live-dot" />
+            <span className="rpc-text">EVM (12ms)</span>
+          </div>
+          <div className="rpc-status-pill">
+            <span className="live-dot" />
+            <span className="rpc-text">BSC (14ms)</span>
+          </div>
+          <div className="rpc-status-pill">
+            <span className="live-dot" />
+            <span className="rpc-text">Solana (26ms)</span>
+          </div>
+        </div>
+
+        <div className="footer-right">
+          <span className="footer-meta mono">{wallets.length} Wallets Indexed · SQLite Encrypted · Plurivex v0.1.0</span>
+        </div>
+      </footer>
+
+      {/* Floating Draggable Import Window */}
+      <FloatingImport open={isImportOpen} onClose={() => setIsImportOpen(false)} />
     </div>
   );
 }

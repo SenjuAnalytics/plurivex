@@ -213,3 +213,89 @@ export async function getExistingFingerprints(): Promise<Set<string>> {
   );
   return new Set(rows.map((r) => r.fingerprint));
 }
+
+export async function getExistingAddresses(): Promise<{
+  evm: Map<string, { id: number; type: WalletType }>;
+  sol: Map<string, { id: number; type: WalletType }>;
+}> {
+  const database = await getDb();
+  const rows = await database.select<{ id: number; type: WalletType; address: string | null; sol_address: string | null }[]>(
+    "SELECT id, type, address, sol_address FROM wallets",
+  );
+  const evm = new Map<string, { id: number; type: WalletType }>();
+  const sol = new Map<string, { id: number; type: WalletType }>();
+  for (const r of rows) {
+    if (r.address) {
+      evm.set(r.address.toLowerCase(), { id: r.id, type: r.type });
+    }
+    if (r.sol_address) {
+      sol.set(r.sol_address, { id: r.id, type: r.type });
+    }
+  }
+  return { evm, sol };
+}
+
+export async function upgradeWalletToSeed(
+  id: number,
+  encryptedSecret: string,
+  fingerprint: string,
+  wordCount: number,
+) {
+  const database = await getDb();
+  await database.execute(
+    "UPDATE wallets SET type = 'seed', encrypted_secret = $1, fingerprint = $2, word_count = $3 WHERE id = $4",
+    [encryptedSecret, fingerprint, wordCount, id],
+  );
+}
+
+export async function cleanupDuplicateWallets(): Promise<number> {
+  const database = await getDb();
+  const rows = await database.select<{ id: number; type: WalletType; address: string | null; sol_address: string | null }[]>(
+    "SELECT id, type, address, sol_address FROM wallets ORDER BY id ASC",
+  );
+
+  let cleaned = 0;
+  const seenEvm = new Map<string, { id: number; type: WalletType }>();
+  const seenSol = new Map<string, { id: number; type: WalletType }>();
+  const toDelete = new Set<number>();
+
+  for (const r of rows) {
+    if (r.address) {
+      const lower = r.address.toLowerCase();
+      if (seenEvm.has(lower)) {
+        const existing = seenEvm.get(lower)!;
+        if (existing.type === "seed" && r.type === "pk") {
+          toDelete.add(r.id);
+        } else if (existing.type === "pk" && r.type === "seed") {
+          toDelete.add(existing.id);
+          seenEvm.set(lower, { id: r.id, type: r.type });
+        } else {
+          toDelete.add(r.id);
+        }
+      } else {
+        seenEvm.set(lower, { id: r.id, type: r.type });
+      }
+    }
+
+    if (r.sol_address) {
+      if (seenSol.has(r.sol_address)) {
+        toDelete.add(r.id);
+      } else {
+        seenSol.set(r.sol_address, { id: r.id, type: r.type });
+      }
+    }
+  }
+
+  for (const delId of toDelete) {
+    try {
+      await database.execute("DELETE FROM token_balances WHERE wallet_id = $1", [delId]);
+      await database.execute("DELETE FROM balances WHERE wallet_id = $1", [delId]);
+      await database.execute("DELETE FROM wallets WHERE id = $1", [delId]);
+      cleaned++;
+    } catch (e) {
+      console.warn("Failed deleting duplicate wallet:", e);
+    }
+  }
+
+  return cleaned;
+}

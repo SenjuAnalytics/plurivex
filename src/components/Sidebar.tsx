@@ -9,20 +9,25 @@ type Filter = "all" | "evm" | "sol" | "funded";
 
 function CustomCheckbox({
   checked,
+  disabled,
+  disabledReason,
   onChange,
 }: {
   checked: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   onChange: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`custom-checkbox-btn ${checked ? "is-checked" : ""}`}
+      className={`custom-checkbox-btn ${checked ? "is-checked" : ""} ${disabled ? "is-disabled" : ""}`}
       onClick={(e) => {
         e.stopPropagation();
-        onChange();
+        if (!disabled) onChange();
       }}
-      title={checked ? "Deselect" : "Select wallet for batch sweep"}
+      disabled={disabled}
+      title={disabled ? disabledReason : checked ? "Deselect" : "Select wallet for batch sweep"}
       aria-label="Select wallet"
     >
       <div className="custom-checkbox-box">
@@ -49,9 +54,11 @@ function WalletRow({
   index,
   selected,
   sweepChecked,
+  hideCheckbox,
   onSelect,
   onToggleSweep,
 }: {
+  hideCheckbox?: boolean;
   wallet: WalletView;
   index: number;
   selected: boolean;
@@ -61,7 +68,7 @@ function WalletRow({
 }) {
   const display = walletDisplayAddress(wallet);
 
-  // Compute clean compact balance preview text
+  // Compute clean primary & secondary balance previews
   const positiveBalances = Object.entries(wallet.balances)
     .filter(([_, val]) => {
       if (!val || val === "loading" || val === "error") return false;
@@ -70,55 +77,58 @@ function WalletRow({
     })
     .map(([_, val]) => formatCompactBalance(val));
 
-  const balanceSummary = positiveBalances.length > 0
-    ? positiveBalances.slice(0, 2).join(" · ") + (positiveBalances.length > 2 ? "…" : "")
-    : wallet.tokens && wallet.tokens.length > 0
-      ? `${wallet.tokens.length} token${wallet.tokens.length > 1 ? "s" : ""}`
-      : null;
+  const primaryBalance = positiveBalances.length > 0 ? positiveBalances[0] : null;
+  const secondaryBalance = positiveBalances.length > 1 ? positiveBalances.slice(1).join(" · ") : null;
 
   return (
     <div
-      className={`wallet-item-wrap${selected ? " active" : ""}${
+      className={`wallet-card-row${selected ? " active" : ""}${
         wallet.hasFunds ? " has-funds" : ""
       }${sweepChecked ? " is-checked" : ""}`}
+      onClick={onSelect}
     >
-      <div className="wallet-item-check">
-        <CustomCheckbox checked={sweepChecked} onChange={onToggleSweep} />
+      {!hideCheckbox && (
+        <div className="card-check-slot" onClick={(e) => e.stopPropagation()}>
+          <CustomCheckbox checked={sweepChecked} onChange={onToggleSweep} />
+        </div>
+      )}
+
+      <div className={`card-icon-slot ${wallet.type === "pk" ? "pk" : wallet.type === "seed" ? "seed" : wallet.type === "sol_pk" ? "sol" : "invalid"}`}>
+        {wallet.type === "seed" ? <IconSeed size={12} /> : wallet.type === "pk" ? <IconKey size={12} /> : wallet.type === "sol_pk" ? "◎" : "!"}
       </div>
-      <button
-        type="button"
-        className={`wallet-item${selected ? " active" : ""}${wallet.hasFunds ? " has-funds" : ""}`}
-        onClick={onSelect}
-      >
-        <div className={`wallet-item-icon ${wallet.type === "pk" ? "pk" : wallet.type === "seed" ? "seed" : wallet.type === "sol_pk" ? "sol" : "invalid"}`}>
-          {wallet.type === "seed" ? <IconSeed size={13} /> : wallet.type === "pk" ? <IconKey size={13} /> : wallet.type === "sol_pk" ? "◎" : "!"}
-        </div>
-        <div className="wallet-item-info">
-          <div className="wallet-item-row-top">
-            <span className="wallet-item-idx mono">#{String(index).padStart(2, "0")}</span>
-            <span className="wallet-item-addr mono">
-              {display ? shortAddr(display) : "invalid"}
-            </span>
+
+      <div className="card-content-slot">
+        <div className="card-slot-top">
+          <div className="card-addr-group">
+            <span className="card-idx mono">#{String(index).padStart(2, "0")}</span>
+            <span className="card-addr mono">{display ? shortAddr(display) : "invalid"}</span>
           </div>
-          <div className="wallet-item-row-sub">
-            <span className="wallet-type-tag">
-              {wallet.type === "seed" ? "SEED" : wallet.type === "pk" ? "EVM" : "SOL"}
-            </span>
-            {balanceSummary ? (
-              <span className="wallet-bal-preview mono" title={positiveBalances.join(" · ")}>
-                {balanceSummary}
-              </span>
-            ) : (
-              <span className="wallet-idle-preview">0 assets</span>
-            )}
-          </div>
+          {primaryBalance ? (
+            <span className="card-primary-bal mono">{primaryBalance}</span>
+          ) : (
+            <span className="card-idle-bal mono">0.00</span>
+          )}
         </div>
-        {wallet.hasFunds && (
-          <span className="fund-dot-badge" title="Has positive funds">
-            ●
+
+        <div className="card-slot-sub">
+          <span className={`card-type-tag tag-${wallet.type}`}>
+            {wallet.type === "seed" ? "SEED" : wallet.type === "pk" ? "EVM" : "SOL"}
           </span>
-        )}
-      </button>
+          {secondaryBalance ? (
+            <span className="card-sub-bal mono" title={positiveBalances.join(" · ")}>
+              {secondaryBalance}
+            </span>
+          ) : wallet.tokens && wallet.tokens.length > 0 ? (
+            <span className="card-sub-tokens mono">
+              +{wallet.tokens.length} token{wallet.tokens.length > 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="card-sub-idle">0 assets</span>
+          )}
+        </div>
+      </div>
+
+      {wallet.hasFunds && <span className="card-fund-dot" title="Active funded asset" />}
     </div>
   );
 }
@@ -128,10 +138,12 @@ function WalletSection({
   wallets,
   selectedId,
   selectedSweepIds,
+  selectedFamily,
   onSelect,
   onToggleSweep,
   startIndex,
 }: {
+  selectedFamily: "evm" | "sol" | null;
   title: string;
   wallets: WalletView[];
   selectedId: number | null;
@@ -152,6 +164,7 @@ function WalletSection({
           selected={selectedId === w.id}
           sweepChecked={selectedSweepIds.has(w.id)}
           onSelect={() => onSelect(w.id)}
+          hideCheckbox={selectedFamily !== null && (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))}
           onToggleSweep={() => onToggleSweep(w.id)}
         />
       ))}
@@ -171,7 +184,6 @@ export function Sidebar() {
     toggleSweepSelection,
     selectAllFunded,
     clearSweepSelection,
-    setIsSweepModalOpen,
   } = useApp();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -193,7 +205,17 @@ export function Sidebar() {
 
   const showGrouped = filter === "all" && !search.trim();
   const fundedCount = useMemo(() => wallets.filter((w) => w.hasFunds).length, [wallets]);
-  const isAllFundedSelected = fundedCount > 0 && selectedSweepIds.size >= fundedCount;
+  const evmFundedCount = useMemo(() => evmWallets.filter((w) => w.hasFunds).length, [evmWallets]);
+  const solFundedCount = useMemo(() => solWallets.filter((w) => w.hasFunds).length, [solWallets]);
+  const activeScopeFundedCount = filter === "evm" ? evmFundedCount : filter === "sol" ? solFundedCount : fundedCount;
+  const isAllFundedSelected = activeScopeFundedCount > 0 && selectedSweepIds.size >= activeScopeFundedCount;
+  const selectedFamily = useMemo<"evm" | "sol" | null>(() => {
+    if (selectedSweepIds.size === 0) return null;
+    const firstSelectedId = Array.from(selectedSweepIds)[0];
+    const firstWallet = wallets.find((w) => w.id === firstSelectedId);
+    if (!firstWallet) return null;
+    return isEvmWallet(firstWallet.type) ? "evm" : "sol";
+  }, [selectedSweepIds, wallets]);
 
   return (
     <aside className="sidebar">
@@ -245,25 +267,17 @@ export function Sidebar() {
         </div>
 
         {/* Batch Selection Toolbar */}
-        <div className="sidebar-batch-bar">
-          <button
-            type="button"
-            className="batch-action-btn"
-            onClick={() => (isAllFundedSelected ? clearSweepSelection() : selectAllFunded())}
-            disabled={fundedCount === 0}
-          >
-            {isAllFundedSelected ? "✕ Deselect All" : `☑️ Select All Funded (${fundedCount})`}
-          </button>
-          {selectedSweepIds.size > 0 && (
+        {fundedCount > 0 && (
+          <div className="sidebar-batch-bar">
             <button
               type="button"
-              className="batch-sweep-btn"
-              onClick={() => setIsSweepModalOpen(true)}
+              className="batch-action-btn"
+              onClick={() => (isAllFundedSelected ? clearSweepSelection() : selectAllFunded(filter === "evm" ? "evm" : filter === "sol" ? "sol" : "all"))}
             >
-              ⚡ Sweep ({selectedSweepIds.size})
+              {isAllFundedSelected ? "✕ Deselect All" : `☑️ Select All Funded (${activeScopeFundedCount})`}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="sidebar-list scrollable">
@@ -289,6 +303,7 @@ export function Sidebar() {
               wallets={evmWallets}
               selectedId={selectedId}
               selectedSweepIds={selectedSweepIds}
+              selectedFamily={selectedFamily}
               onSelect={setSelectedId}
               onToggleSweep={toggleSweepSelection}
               startIndex={0}
@@ -298,6 +313,7 @@ export function Sidebar() {
               wallets={solWallets}
               selectedId={selectedId}
               selectedSweepIds={selectedSweepIds}
+              selectedFamily={selectedFamily}
               onSelect={setSelectedId}
               onToggleSweep={toggleSweepSelection}
               startIndex={evmWallets.length}
@@ -311,31 +327,13 @@ export function Sidebar() {
               index={i + 1}
               selected={selectedId === w.id}
               sweepChecked={selectedSweepIds.has(w.id)}
+              hideCheckbox={selectedFamily !== null && (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))}
               onSelect={() => setSelectedId(w.id)}
               onToggleSweep={() => toggleSweepSelection(w.id)}
             />
           ))
         )}
       </div>
-
-      {/* Floating sweep action bar at the bottom if items checked */}
-      {selectedSweepIds.size > 0 && (
-        <div className="sidebar-sweep-dock">
-          <div className="dock-left">
-            <span className="dock-count mono">{selectedSweepIds.size} selected</span>
-            <button type="button" className="dock-clear-btn" onClick={clearSweepSelection}>
-              Clear
-            </button>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm dock-sweep-btn"
-            onClick={() => setIsSweepModalOpen(true)}
-          >
-            ⚡ Sweep Funds
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

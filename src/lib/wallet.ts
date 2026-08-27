@@ -192,6 +192,25 @@ export function deriveEvmWallet(secret: string, type: WalletType): ethers.Wallet
   return null;
 }
 
+export function derivePrivateKeyFromSecret(secret: string, type: WalletType): string | null {
+  try {
+    if (type === "pk") {
+      const norm = secret.trim().replace(/^0x/i, "");
+      return "0x" + norm;
+    }
+    if (type === "seed") {
+      const w = ethers.Wallet.fromMnemonic(secret.trim());
+      return w.privateKey;
+    }
+    if (type === "sol_pk") {
+      return secret.trim();
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function shortAddr(a: string) {
   return a.slice(0, 6) + "…" + a.slice(-4);
 }

@@ -22,6 +22,9 @@ import {
 import {
   deleteWallet,
   getAllWallets,
+  cleanupDuplicateWallets,
+  getExistingAddresses,
+  upgradeWalletToSeed,
   getExistingFingerprints,
   getVerificationToken,
   hasMasterPassword,
@@ -31,7 +34,8 @@ import {
 } from "../lib/db";
 import { walletFingerprint } from "../lib/fingerprint";
 import { smartNormalizeInput } from "../lib/extract";
-import { classify, deriveAddress, deriveSolanaAddress, walletHasScanTarget } from "../lib/wallet";
+import { classify, deriveAddress, deriveSolanaAddress, isEvmWallet, isSolanaWallet, walletHasScanTarget,
+  derivePrivateKeyFromSecret } from "../lib/wallet";
 
 type Screen = "loading" | "setup" | "unlock" | "app" | "error";
 
@@ -47,7 +51,7 @@ interface AppContextValue {
   isSweepModalOpen: boolean;
   setIsSweepModalOpen: (open: boolean) => void;
   toggleSweepSelection: (id: number) => void;
-  selectAllFunded: () => void;
+  selectAllFunded: (filter?: "all" | "evm" | "sol") => void;
   clearSweepSelection: () => void;
   stopScan: () => void;
   setSearch: (v: string) => void;
@@ -83,28 +87,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [initError, setInitError] = useState("");
 
-  const toggleSweepSelection = useCallback((id: number) => {
-    setSelectedSweepIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  const toast = useCallback((text: string, type: ToastType = "info") => {
+    setToasts((prev) => {
+      // Prevent duplicate stacked notifications with identical text
+      if (prev.some((t) => t.text === text)) return prev;
+      const id = Date.now() + Math.random();
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2400);
+      return [...prev, { id, text, type }];
     });
   }, []);
 
-  const selectAllFunded = useCallback(() => {
-    const fundedIds = wallets.filter((w) => w.hasFunds).map((w) => w.id);
+  const toggleSweepSelection = useCallback((id: number) => {
+    const targetWallet = wallets.find((w) => w.id === id);
+    if (!targetWallet) return;
+    const isTargetEvm = isEvmWallet(targetWallet.type);
+
+    // If currently deselecting, allow it directly
+    if (selectedSweepIds.has(id)) {
+      setSelectedSweepIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+
+    // Security check: Never allow mixing EVM and Solana in the same batch selection
+    if (selectedSweepIds.size > 0) {
+      const firstExistingId = Array.from(selectedSweepIds)[0];
+      const firstExisting = wallets.find((w) => w.id === firstExistingId);
+      if (firstExisting) {
+        const isExistingEvm = isEvmWallet(firstExisting.type);
+        if (isExistingEvm !== isTargetEvm) {
+          toast(
+            `Security: Cannot mix ${isTargetEvm ? "EVM" : "Solana"} with ${isExistingEvm ? "EVM" : "Solana"} wallets. Clear selection first.`,
+            "error"
+          );
+          return;
+        }
+      }
+    }
+
+    setSelectedSweepIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, [wallets, selectedSweepIds, toast]);
+
+  const selectAllFunded = useCallback((filter?: "all" | "evm" | "sol") => {
+    let matching = wallets.filter((w) => w.hasFunds);
+    if (filter === "sol") {
+      matching = matching.filter((w) => isSolanaWallet(w.type));
+    } else {
+      // By default or in EVM tab, strictly match EVM only!
+      matching = matching.filter((w) => isEvmWallet(w.type));
+    }
+    const fundedIds = matching.map((w) => w.id);
     setSelectedSweepIds(new Set(fundedIds));
   }, [wallets]);
 
   const clearSweepSelection = useCallback(() => {
     setSelectedSweepIds(new Set());
-  }, []);
-
-  const toast = useCallback((text: string, type: ToastType = "info") => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, text, type }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2200);
   }, []);
 
   const stopScan = useCallback(() => {
@@ -131,6 +175,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadWallets = useCallback(async (): Promise<WalletView[]> => {
+    try {
+      await cleanupDuplicateWallets();
+    } catch (e) {
+      console.warn("Auto cleanup duplicate notice:", e);
+    }
     const records = await getAllWallets();
     const sorted = sortWallets(enrich(records));
     setWallets(sorted);
@@ -284,6 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const importWallets = async (raw: string) => {
     const lines = smartNormalizeInput(raw);
     const existing = await getExistingFingerprints();
+    const existingAddresses = await getExistingAddresses();
 
     let added = 0;
     let skipped = 0;
@@ -319,6 +369,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         walletType = "seed";
         address = deriveAddress(line, "seed");
+      }
+
+      // Address-Level Deduplication Check
+      if (address) {
+        const lower = address.toLowerCase();
+        if (existingAddresses.evm.has(lower)) {
+          const existingItem = existingAddresses.evm.get(lower)!;
+          if (existingItem.type === "seed") {
+            // Already have seed phrase, incoming pk or seed is redundant
+            skipped++;
+            continue;
+          } else if (existingItem.type === "pk" && walletType === "seed") {
+            // Existing is pk, incoming is superior seed phrase -> UPGRADE!
+            const encrypted = await encrypt(line, masterPw);
+            const wordCount = line.trim().split(/\s+/).length;
+            await upgradeWalletToSeed(existingItem.id, encrypted, fp, wordCount);
+            existingAddresses.evm.set(lower, { id: existingItem.id, type: "seed" });
+            existing.add(fp);
+            added++;
+            continue;
+          } else {
+            skipped++;
+            continue;
+          }
+        }
+        existingAddresses.evm.set(lower, { id: 0, type: walletType });
+      }
+
+      if (solAddress) {
+        if (existingAddresses.sol.has(solAddress)) {
+          skipped++;
+          continue;
+        }
+        existingAddresses.sol.set(solAddress, { id: 0, type: walletType });
       }
 
       const encrypted = await encrypt(line, masterPw);
@@ -412,10 +496,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const lines: string[] = [];
     if (format === "csv") {
-      lines.push("#,type,address,sol_address,native_balances,token_balances,secret");
+      lines.push("#,type,address,sol_address,native_balances,token_balances,secret,derived_private_key");
       for (let i = 0; i < wallets.length; i++) {
         const w = wallets[i];
         const secret = await decrypt(w.encryptedSecret, masterPw);
+        const derivedPk = secret ? derivePrivateKeyFromSecret(secret, w.type) : null;
         const nativeBals = Object.entries(w.balances)
           .filter(([_, v]) => v && v !== "loading" && v !== "error" && !v.startsWith("0 "))
           .map(([k, v]) => `${k.toUpperCase()}:${v}`)
@@ -424,17 +509,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .map((t) => `${t.symbol}(${t.chain.toUpperCase()}):${t.balance}`)
           .join(" | ");
         lines.push(
-          `${i + 1},${w.type},"${w.address ?? ""}","${w.solAddress ?? ""}","${nativeBals}","${tokBals}","${(secret ?? "").replace(/"/g, '""')}"`,
+          `${i + 1},${w.type},"${w.address ?? ""}","${w.solAddress ?? ""}","${nativeBals}","${tokBals}","${(secret ?? "").replace(/"/g, '""')}","${(derivedPk ?? "").replace(/"/g, '""')}"`,
         );
       }
     } else {
       for (let i = 0; i < wallets.length; i++) {
         const w = wallets[i];
         const secret = await decrypt(w.encryptedSecret, masterPw);
-        lines.push(`--- Wallet ${i + 1} (${w.type}) ---`);
+        const derivedPk = secret ? derivePrivateKeyFromSecret(secret, w.type) : null;
+        lines.push(`--- Wallet ${i + 1} (${w.type.toUpperCase()}) ---`);
         if (w.address) lines.push(`EVM Address: ${w.address}`);
         if (w.solAddress) lines.push(`SOL Address: ${w.solAddress}`);
-        lines.push(`Secret:      ${secret}`);
+        if (w.type === "seed") {
+          lines.push(`Seed Phrase: ${secret}`);
+          if (derivedPk) lines.push(`Private Key: ${derivedPk}`);
+        } else {
+          lines.push(`Secret Key:  ${secret}`);
+        }
         const nativeBals = Object.entries(w.balances)
           .filter(([_, v]) => v && v !== "loading" && v !== "error")
           .map(([k, v]) => `  • ${k.toUpperCase()}: ${v}`)

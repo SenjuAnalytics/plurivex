@@ -16,6 +16,7 @@ pub struct TokenDef {
     pub decimals: u8,
 }
 
+#[derive(PartialEq)]
 enum ChainKind {
     Evm,
     Solana,
@@ -715,6 +716,17 @@ pub struct ChainFeeResponse {
 #[tauri::command]
 pub async fn get_chain_fee_data(chain_key: String) -> Result<ChainFeeResponse, String> {
     let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+
+    if chain.kind == ChainKind::Solana {
+        return Ok(ChainFeeResponse {
+            gas_price_gwei: 0.0,
+            priority_fee_gwei: 0.0,
+            estimated_fee_eth: "0.00000500 SOL".to_string(),
+            chain_id: 101,
+            symbol: "SOL".to_string(),
+        });
+    }
+
     let client = shared_client();
 
     let chain_id = match chain.key {
@@ -792,6 +804,41 @@ pub struct AccountInfoResponse {
 pub async fn get_account_nonce_and_balance(chain_key: String, address: String) -> Result<AccountInfoResponse, String> {
     let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
     let client = shared_client();
+
+    if chain.kind == ChainKind::Solana {
+        for rpc in chain.rpcs {
+            let resp = client
+                .post(*rpc)
+                .header("Content-Type", "application/json")
+                .header("User-Agent", "WalletInspector/1.0")
+                .json(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getBalance",
+                    "params": [address, {"commitment": "confirmed"}]
+                }))
+                .send()
+                .await;
+
+            if let Ok(res) = resp {
+                if res.status().is_success() {
+                    if let Ok(data) = res.json::<serde_json::Value>().await {
+                        if let Some(lamports) = data.pointer("/result/value").and_then(|v| v.as_u64()) {
+                            let sol_amt = (lamports as f64) / 1e9;
+                            let formatted = format!("{:.6} SOL", sol_amt);
+                            return Ok(AccountInfoResponse {
+                                balance_hex: format!("{:#x}", lamports),
+                                balance_eth: sol_amt,
+                                balance_formatted: formatted,
+                                nonce: 0,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        return Err("Failed to query Solana balance from all RPC nodes".to_string());
+    }
 
     let batch = serde_json::json!([
         {
@@ -886,5 +933,81 @@ pub async fn broadcast_raw_tx(chain_key: String, raw_tx: String) -> Result<Strin
         }
     }
 
-    Err(format!("Failed to broadcast transaction to all RPC nodes for chain {chain_key}"))
+    Err(format!("All RPC nodes failed to broadcast transaction for chain {chain_key}"))
+}
+
+#[tauri::command]
+pub async fn get_solana_recent_blockhash() -> Result<String, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    let client = shared_client();
+
+    for rpc in chain.rpcs {
+        let resp = client
+            .post(*rpc)
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "WalletInspector/1.0")
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getLatestBlockhash",
+                "params": [{"commitment": "confirmed"}]
+            }))
+            .send()
+            .await;
+
+        if let Ok(res) = resp {
+            if res.status().is_success() {
+                if let Ok(data) = res.json::<serde_json::Value>().await {
+                    if let Some(bh) = data.pointer("/result/value/blockhash").and_then(|b| b.as_str()) {
+                        return Ok(bh.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Err("Failed to fetch Solana recent blockhash from RPC nodes".to_string())
+}
+
+#[tauri::command]
+pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    let client = shared_client();
+
+    for rpc in chain.rpcs {
+        let resp = client
+            .post(*rpc)
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "WalletInspector/1.0")
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "sendTransaction",
+                "params": [
+                    raw_tx_base64,
+                    {
+                        "encoding": "base64",
+                        "preflightCommitment": "confirmed"
+                    }
+                ]
+            }))
+            .send()
+            .await;
+
+        if let Ok(res) = resp {
+            if res.status().is_success() {
+                if let Ok(data) = res.json::<serde_json::Value>().await {
+                    if let Some(sig) = data.get("result").and_then(|r| r.as_str()) {
+                        return Ok(sig.to_string());
+                    }
+                    if let Some(err) = data.get("error") {
+                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Solana RPC Error");
+                        return Err(msg.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Err("All Solana RPC nodes failed to broadcast transaction".to_string())
 }
