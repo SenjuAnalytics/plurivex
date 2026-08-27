@@ -37,3 +37,7 @@ plurix.db
 *.njsproj
 *.sln
 *.sw?
+
+# User local test folders & media
+contohfile/
+gambar/
