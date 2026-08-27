@@ -181,11 +181,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadWallets = useCallback(async (): Promise<WalletView[]> => {
-    try {
-      await cleanupDuplicateWallets();
-    } catch (e) {
-      console.warn("Auto cleanup duplicate notice:", e);
-    }
     const records = await getAllWallets();
     const sorted = sortWallets(enrich(records));
     setWallets(sorted);
@@ -429,6 +424,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (batchToInsert.length > 0) {
       await insertWalletsBatch(batchToInsert);
+      try {
+        await cleanupDuplicateWallets();
+      } catch (e) {
+        console.warn("Cleanup duplicate notice:", e);
+      }
     }
 
     const list = await loadWallets();

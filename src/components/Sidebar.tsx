@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { isEvmWallet, isSolanaWallet, shortAddr, walletDisplayAddress } from "../lib/wallet";
 import { formatCompactBalance } from "../lib/chains";
 import type { WalletView } from "../lib/types";
 import { IconSearch, IconSeed, IconKey } from "../icons";
+import { ChainIcon } from "../icons/ChainIcon";
 
 type Filter = "all" | "evm" | "sol" | "funded";
 
@@ -49,7 +50,14 @@ function CustomCheckbox({
   );
 }
 
-function WalletRow({
+const ITEM_HEIGHT = 58;
+const BUFFER_ITEMS = 12;
+
+type ListItem =
+  | { type: "header"; id: string; title: string; count: number }
+  | { type: "wallet"; id: number; wallet: WalletView; index: number };
+
+const WalletRow = memo(function WalletRow({
   wallet,
   index,
   selected,
@@ -63,33 +71,84 @@ function WalletRow({
   index: number;
   selected: boolean;
   sweepChecked: boolean;
-  onSelect: () => void;
-  onToggleSweep: () => void;
+  onSelect: (id: number) => void;
+  onToggleSweep: (id: number) => void;
 }) {
   const display = walletDisplayAddress(wallet);
+  const handleSelect = useCallback(() => onSelect(wallet.id), [onSelect, wallet.id]);
+  const handleToggle = useCallback(() => onToggleSweep(wallet.id), [onToggleSweep, wallet.id]);
 
-  // Compute clean primary & secondary balance previews
-  const positiveBalances = Object.entries(wallet.balances)
+  // Approximate USD weight to find the truly largest balance
+  const approximateUsdRate: Record<string, number> = {
+    eth: 2600,
+    bsc: 600,
+    base: 2600,
+    arbitrum: 2600,
+    polygon: 0.5,
+    avalanche: 25,
+    solana: 180,
+  };
+
+  // 1. Gather all positive native chain balances (ETH, BNB, SOL, etc.)
+  const nativeBalances = Object.entries(wallet.balances)
     .filter(([_, val]) => {
       if (!val || val === "loading" || val === "error") return false;
       const num = parseFloat(val.split(" ")[0]);
       return num > 0;
     })
-    .map(([_, val]) => formatCompactBalance(val));
+    .map(([chainKey, val]) => {
+      const safeVal = val ?? "";
+      const num = parseFloat(safeVal.split(" ")[0]) || 0;
+      const rate = approximateUsdRate[chainKey.toLowerCase()] || 1;
+      return {
+        key: `native-${chainKey}`,
+        chainKey,
+        label: chainKey.toUpperCase(),
+        num,
+        estimatedUsd: num * rate,
+        formatted: formatCompactBalance(safeVal),
+        isToken: false,
+      };
+    })
+    .sort((a, b) => b.estimatedUsd - a.estimatedUsd || b.num - a.num);
 
-  const primaryBalance = positiveBalances.length > 0 ? positiveBalances[0] : null;
-  const secondaryBalance = positiveBalances.length > 1 ? positiveBalances.slice(1).join(" · ") : null;
+  // 2. Gather all positive token holdings (ERC-20, SPL, etc.)
+  const tokenBalances = (wallet.tokens || [])
+    .filter((tok) => {
+      const num = parseFloat(tok.balance);
+      return !isNaN(num) && num > 0;
+    })
+    .map((tok) => {
+      const num = parseFloat(tok.balance) || 0;
+      const formatted = `${num < 0.0001 ? "< 0.0001" : num < 1000 ? num.toLocaleString("en-US", { maximumFractionDigits: 4 }) : formatCompactBalance(`${num} ${tok.symbol}`)} ${tok.symbol}`;
+      return {
+        key: `token-${tok.chain}-${tok.symbol}`,
+        chainKey: tok.chain,
+        label: `${tok.symbol} (${tok.chain.toUpperCase()})`,
+        num,
+        formatted,
+        isToken: true,
+      };
+    });
+
+  // NATIVE COIN ALWAYS HAS PRIMARY PRIORITY ON THE CARD
+  const primaryHolding = nativeBalances[0] || tokenBalances[0] || null;
+
+  // Extra items for tooltip (+N)
+  const remainingNative = nativeBalances.slice(primaryHolding && !primaryHolding.isToken ? 1 : 0);
+  const remainingTokens = tokenBalances.slice(primaryHolding && primaryHolding.isToken ? 1 : 0);
+  const totalExtraCount = remainingNative.length + remainingTokens.length;
 
   return (
     <div
       className={`wallet-card-row${selected ? " active" : ""}${
         wallet.hasFunds ? " has-funds" : ""
       }${sweepChecked ? " is-checked" : ""}`}
-      onClick={onSelect}
+      onClick={handleSelect}
     >
       {!hideCheckbox && (
         <div className="card-check-slot" onClick={(e) => e.stopPropagation()}>
-          <CustomCheckbox checked={sweepChecked} onChange={onToggleSweep} />
+          <CustomCheckbox checked={sweepChecked} onChange={handleToggle} />
         </div>
       )}
 
@@ -101,76 +160,78 @@ function WalletRow({
         <div className="card-slot-top">
           <div className="card-addr-group">
             <span className="card-idx mono">#{String(index).padStart(2, "0")}</span>
-            <span className="card-addr mono">{display ? shortAddr(display) : "invalid"}</span>
+            <span className="card-addr mono" title={display || undefined}>
+              {display ? shortAddr(display) : "invalid"}
+            </span>
           </div>
-          {primaryBalance ? (
-            <span className="card-primary-bal mono">{primaryBalance}</span>
-          ) : (
-            <span className="card-idle-bal mono">0.00</span>
-          )}
         </div>
 
         <div className="card-slot-sub">
           <span className={`card-type-tag tag-${wallet.type}`}>
             {wallet.type === "seed" ? "SEED" : wallet.type === "pk" ? "EVM" : "SOL"}
           </span>
-          {secondaryBalance ? (
-            <span className="card-sub-bal mono" title={positiveBalances.join(" · ")}>
-              {secondaryBalance}
-            </span>
-          ) : wallet.tokens && wallet.tokens.length > 0 ? (
-            <span className="card-sub-tokens mono">
-              +{wallet.tokens.length} token{wallet.tokens.length > 1 ? "s" : ""}
-            </span>
-          ) : (
-            <span className="card-sub-idle">0 assets</span>
-          )}
+
+          <div className="card-bals-cluster">
+            {!primaryHolding ? (
+              <span className="card-sub-idle">0 assets</span>
+            ) : (
+              <div className="card-single-primary-wrap">
+                <span className="card-bal-badge">
+                  <ChainIcon chain={primaryHolding.chainKey} size={13.5} className="card-bal-icon" />
+                  <span className="card-primary-bal mono">{primaryHolding.formatted}</span>
+                </span>
+                {totalExtraCount > 0 && (
+                  <span className="card-more-pill-wrap">
+                    <span className="card-more-pill mono">
+                      +{totalExtraCount}
+                    </span>
+                    <div className={`card-custom-tooltip ${index <= 2 ? "tooltip-down" : "tooltip-up"}`}>
+                      {remainingNative.length > 0 && (
+                        <>
+                          <div className="card-tooltip-header">Other Native Balances</div>
+                          {remainingNative.map((b) => (
+                            <div key={b.key} className="card-tooltip-row">
+                              <div className="card-tooltip-chain">
+                                <ChainIcon chain={b.chainKey} size={13} />
+                                <span>{b.label}</span>
+                              </div>
+                              <span className="card-tooltip-bal mono">{b.formatted}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {remainingTokens.length > 0 && (
+                        <>
+                          <div
+                            className="card-tooltip-header"
+                            style={remainingNative.length > 0 ? { marginTop: "4px" } : undefined}
+                          >
+                            Tokens Held
+                          </div>
+                          {remainingTokens.map((b) => (
+                            <div key={b.key} className="card-tooltip-row">
+                              <div className="card-tooltip-chain">
+                                <ChainIcon chain={b.chainKey} size={13} />
+                                <span>{b.label}</span>
+                              </div>
+                              <span className="card-tooltip-bal mono">{b.formatted}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {wallet.hasFunds && <span className="card-fund-dot" title="Active funded asset" />}
     </div>
   );
-}
-
-function WalletSection({
-  title,
-  wallets,
-  selectedId,
-  selectedSweepIds,
-  selectedFamily,
-  onSelect,
-  onToggleSweep,
-  startIndex,
-}: {
-  selectedFamily: "evm" | "sol" | null;
-  title: string;
-  wallets: WalletView[];
-  selectedId: number | null;
-  selectedSweepIds: Set<number>;
-  onSelect: (id: number) => void;
-  onToggleSweep: (id: number) => void;
-  startIndex: number;
-}) {
-  if (!wallets.length) return null;
-  return (
-    <div className="sidebar-section">
-      <div className="sidebar-section-label">{title} <span>{wallets.length}</span></div>
-      {wallets.map((w, i) => (
-        <WalletRow
-          key={w.id}
-          wallet={w}
-          index={startIndex + i + 1}
-          selected={selectedId === w.id}
-          sweepChecked={selectedSweepIds.has(w.id)}
-          onSelect={() => onSelect(w.id)}
-          hideCheckbox={selectedFamily !== null && (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))}
-          onToggleSweep={() => onToggleSweep(w.id)}
-        />
-      ))}
-    </div>
-  );
-}
+});
 
 export function Sidebar() {
   const {
@@ -216,6 +277,60 @@ export function Sidebar() {
     if (!firstWallet) return null;
     return isEvmWallet(firstWallet.type) ? "evm" : "sol";
   }, [selectedSweepIds, wallets]);
+
+  const handleSelect = useCallback((id: number) => {
+    setSelectedId(id);
+  }, [setSelectedId]);
+
+  const handleToggleSweep = useCallback((id: number) => {
+    toggleSweepSelection(id);
+  }, [toggleSweepSelection]);
+
+  const items: ListItem[] = useMemo(() => {
+    if (showGrouped) {
+      const res: ListItem[] = [];
+      if (evmWallets.length > 0) {
+        res.push({ type: "header", id: "header-evm", title: "EVM NETWORKS", count: evmWallets.length });
+        for (let i = 0; i < evmWallets.length; i++) {
+          res.push({ type: "wallet", id: evmWallets[i].id, wallet: evmWallets[i], index: i + 1 });
+        }
+      }
+      if (solWallets.length > 0) {
+        res.push({ type: "header", id: "header-sol", title: "SOLANA NETWORK", count: solWallets.length });
+        for (let i = 0; i < solWallets.length; i++) {
+          res.push({
+            type: "wallet",
+            id: solWallets[i].id,
+            wallet: solWallets[i],
+            index: evmWallets.length + i + 1,
+          });
+        }
+      }
+      return res;
+    }
+    return list.map((w, i) => ({
+      type: "wallet",
+      id: w.id,
+      wallet: w,
+      index: i + 1,
+    }));
+  }, [showGrouped, evmWallets, solWallets, list]);
+
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(750);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      setContainerHeight(scrollRef.current.clientHeight || 750);
+    }
+  }, []);
+
+  const totalHeight = items.length * ITEM_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER_ITEMS);
+  const endIndex = Math.min(items.length, Math.ceil((scrollTop + containerHeight) / ITEM_HEIGHT) + BUFFER_ITEMS);
+  const visibleItems = items.slice(startIndex, endIndex);
+  const offsetY = startIndex * ITEM_HEIGHT;
 
   return (
     <aside className="sidebar">
@@ -294,8 +409,12 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="sidebar-list scrollable">
-        {!list.length ? (
+      <div
+        className="sidebar-list scrollable"
+        ref={scrollRef}
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+      >
+        {!items.length ? (
           <div className="sidebar-empty">
             <div className="sidebar-empty-icon">
               {filter === "funded" ? "💰" : "🔍"}
@@ -310,42 +429,49 @@ export function Sidebar() {
               <>No matching wallets found.</>
             )}
           </div>
-        ) : showGrouped ? (
-          <>
-            <WalletSection
-              title="EVM NETWORKS"
-              wallets={evmWallets}
-              selectedId={selectedId}
-              selectedSweepIds={selectedSweepIds}
-              selectedFamily={selectedFamily}
-              onSelect={setSelectedId}
-              onToggleSweep={toggleSweepSelection}
-              startIndex={0}
-            />
-            <WalletSection
-              title="SOLANA NETWORK"
-              wallets={solWallets}
-              selectedId={selectedId}
-              selectedSweepIds={selectedSweepIds}
-              selectedFamily={selectedFamily}
-              onSelect={setSelectedId}
-              onToggleSweep={toggleSweepSelection}
-              startIndex={evmWallets.length}
-            />
-          </>
         ) : (
-          list.map((w, i) => (
-            <WalletRow
-              key={w.id}
-              wallet={w}
-              index={i + 1}
-              selected={selectedId === w.id}
-              sweepChecked={selectedSweepIds.has(w.id)}
-              hideCheckbox={selectedFamily !== null && (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))}
-              onSelect={() => setSelectedId(w.id)}
-              onToggleSweep={() => toggleSweepSelection(w.id)}
-            />
-          ))
+          <div style={{ height: `${totalHeight}px`, position: "relative", width: "100%" }}>
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${offsetY}px)`,
+                willChange: "transform",
+              }}
+            >
+              {visibleItems.map((item) => {
+                if (item.type === "header") {
+                  return (
+                    <div
+                      key={item.id}
+                      className="sidebar-section-label"
+                      style={{ height: "32px", display: "flex", alignItems: "center", marginBottom: "6px" }}
+                    >
+                      {item.title} <span>{item.count}</span>
+                    </div>
+                  );
+                }
+                const w = item.wallet;
+                return (
+                  <WalletRow
+                    key={w.id}
+                    wallet={w}
+                    index={item.index}
+                    selected={selectedId === w.id}
+                    sweepChecked={selectedSweepIds.has(w.id)}
+                    hideCheckbox={
+                      selectedFamily !== null &&
+                      (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))
+                    }
+                    onSelect={handleSelect}
+                    onToggleSweep={handleToggleSweep}
+                  />
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </aside>

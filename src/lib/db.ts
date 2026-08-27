@@ -153,23 +153,42 @@ export async function getAllWallets(): Promise<WalletRecord[]> {
     tokens = [];
   }
 
+  // O(N) Indexing by wallet_id to eliminate 190+ million nested loop iterations
+  const balancesByWallet = new Map<number, { chain: string; balance: string | null }[]>();
+  for (const b of balances) {
+    const list = balancesByWallet.get(b.wallet_id);
+    if (list) list.push(b);
+    else balancesByWallet.set(b.wallet_id, [b]);
+  }
+
+  const tokensByWallet = new Map<number, typeof tokens>();
+  for (const t of tokens) {
+    const list = tokensByWallet.get(t.wallet_id);
+    if (list) list.push(t);
+    else tokensByWallet.set(t.wallet_id, [t]);
+  }
+
   return rows.map((r) => {
     const balMap: Record<string, string | null> = {};
     for (const c of CHAINS) balMap[c.key] = null;
-    for (const b of balances.filter((x) => x.wallet_id === r.id)) {
-      balMap[b.chain] = b.balance;
+    const wBalances = balancesByWallet.get(r.id);
+    if (wBalances) {
+      for (const b of wBalances) {
+        balMap[b.chain] = b.balance;
+      }
     }
-    const walletTokens = tokens
-      .filter((x) => x.wallet_id === r.id)
-      .map((t) => ({
-        walletId: t.wallet_id,
-        chain: t.chain,
-        symbol: t.token_symbol,
-        name: t.token_name ?? t.token_symbol,
-        balance: t.balance,
-        rawBalance: t.raw_balance ?? undefined,
-        contractAddress: t.contract_address ?? undefined,
-      }));
+    const wTokens = tokensByWallet.get(r.id);
+    const walletTokens = wTokens
+      ? wTokens.map((t) => ({
+          walletId: t.wallet_id,
+          chain: t.chain,
+          symbol: t.token_symbol,
+          name: t.token_name ?? t.token_symbol,
+          balance: t.balance,
+          rawBalance: t.raw_balance ?? undefined,
+          contractAddress: t.contract_address ?? undefined,
+        }))
+      : [];
 
     return {
       id: r.id,
