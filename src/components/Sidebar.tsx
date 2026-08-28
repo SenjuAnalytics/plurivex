@@ -507,7 +507,8 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Chain-Specific Quick Filter: ONLY shown when on Funded Tab */}
+        {/* Secondary filter zone: chain quick-filter (funded tab) + tag directory, visually grouped and separated from the primary tabs above */}
+        <div className="sidebar-filter-zone">
         {filter === "funded" && (
           <div className="chain-filter-scroll">
             <button
@@ -608,6 +609,7 @@ export function Sidebar() {
                 🏷️ {t}
               </button>
             ))}
+        </div>
         </div>
 
         {/* Batch Selection Toolbar */}

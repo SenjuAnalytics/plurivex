@@ -85,65 +85,83 @@ export function ExportModal() {
         </div>
 
         <div className="export-modal-body">
-          {/* Section 1: Preset Mode Selection */}
+          {/* Section 1: Preset Mode Selection — redesigned as selectable rows with explicit
+              risk indicator (contains keys vs address-only) and a real selection marker,
+              instead of 4 visually-identical boxes. */}
           <div className="export-section">
             <label className="export-section-label">1. CHOOSE EXPORT PRESET</label>
-            <div className="export-presets-grid">
+            <div className="export-presets-list">
               <div
-                className={`export-preset-card ${preset === "all" ? "active" : ""}`}
+                className={`export-preset-row ${preset === "all" ? "active" : ""}`}
                 onClick={() => setPreset("all")}
               >
-                <div className="preset-card-top">
-                  <span className="preset-icon">📦</span>
+                <span className="preset-select-dot" aria-hidden />
+                <span className="preset-icon-badge risk-secret">📦</span>
+                <div className="preset-row-info">
                   <span className="preset-name">Full Vault Backup</span>
+                  <span className="preset-card-desc">
+                    All {wallets.length} wallets with EVM/Solana addresses, private keys &amp; seed phrases.
+                  </span>
                 </div>
-                <div className="preset-card-desc">
-                  All {wallets.length} wallets with EVM/Solana addresses, private keys & seed phrases.
+                <div className="preset-row-meta">
+                  <span className="preset-risk-tag risk-secret">Contains Keys</span>
+                  <span className="preset-card-badge mono">{wallets.length} Wallets</span>
                 </div>
-                <div className="preset-card-badge mono">{wallets.length} Wallets</div>
               </div>
 
               <div
-                className={`export-preset-card ${preset === "funded" ? "active" : ""}`}
+                className={`export-preset-row ${preset === "funded" ? "active" : ""}`}
                 onClick={() => setPreset("funded")}
               >
-                <div className="preset-card-top">
-                  <span className="preset-icon">💰</span>
+                <span className="preset-select-dot" aria-hidden />
+                <span className="preset-icon-badge risk-secret">💰</span>
+                <div className="preset-row-info">
                   <span className="preset-name">Funded Only</span>
+                  <span className="preset-card-desc">
+                    Only wallets holding native gas or tokens ($ &gt; 0). Skips empty wallets.
+                  </span>
                 </div>
-                <div className="preset-card-desc">
-                  Only wallets holding native gas or tokens ($ &gt; 0). Skips empty wallets.
+                <div className="preset-row-meta">
+                  <span className="preset-risk-tag risk-secret">Contains Keys</span>
+                  <span className="preset-card-badge mono">{fundedCount} Wallets</span>
                 </div>
-                <div className="preset-card-badge mono">{fundedCount} Wallets</div>
               </div>
 
               <div
-                className={`export-preset-card ${preset === "public_only" ? "active" : ""}`}
+                className={`export-preset-row ${preset === "public_only" ? "active" : ""}`}
                 onClick={() => setPreset("public_only")}
               >
-                <div className="preset-card-top">
-                  <span className="preset-icon">🛡️</span>
+                <span className="preset-select-dot" aria-hidden />
+                <span className="preset-icon-badge risk-safe">🛡️</span>
+                <div className="preset-row-info">
                   <span className="preset-name">Public Addresses Only</span>
+                  <span className="preset-card-desc">
+                    Safe sharing mode. Only exports EVM 0x and Solana addresses without secrets.
+                  </span>
                 </div>
-                <div className="preset-card-desc">
-                  Safe sharing mode. Only exports EVM 0x and Solana addresses without secrets.
+                <div className="preset-row-meta">
+                  <span className="preset-risk-tag risk-safe">No Secrets</span>
+                  <span className="preset-card-badge mono">{wallets.length} Wallets</span>
                 </div>
-                <div className="preset-card-badge mono">{wallets.length} Wallets</div>
               </div>
 
               <div
-                className={`export-preset-card ${preset === "tagged" ? "active" : ""}`}
+                className={`export-preset-row ${preset === "tagged" ? "active" : ""}`}
                 onClick={() => setPreset("tagged")}
               >
-                <div className="preset-card-top">
-                  <span className="preset-icon">🏷️</span>
+                <span className="preset-select-dot" aria-hidden />
+                <span className="preset-icon-badge risk-secret">🏷️</span>
+                <div className="preset-row-info">
                   <span className="preset-name">Tagged / Folder Only</span>
+                  <span className="preset-card-desc">
+                    Export wallets categorized under a specific campaign or purpose tag.
+                  </span>
                 </div>
-                <div className="preset-card-desc">
-                  Export wallets categorized under a specific campaign or purpose tag.
-                </div>
-                <div className="preset-card-badge mono">
-                  {preset === "tagged" ? `${matchingCount} Wallets` : "By Tag"}
+                <div className="preset-row-meta">
+                  <span className="preset-risk-tag risk-secret">Contains Keys</span>
+                  <span className="preset-card-badge mono">
+                    {preset === "tagged" ? `${matchingCount} Wallets` : "By Tag"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -174,31 +192,39 @@ export function ExportModal() {
             )}
           </div>
 
-          {/* Section 2: Format Choice */}
+          {/* Section 2: Format Choice — deliberately a compact segmented pair, visually distinct
+              from the preset rows above (icon-in-circle + label, not another card grid) so the
+              two decisions don't blur into one repeated pattern. */}
           <div className="export-section">
             <label className="export-section-label">2. CHOOSE FILE FORMAT</label>
-            <div className="export-formats-row">
+            <div className="export-format-segmented">
               <button
                 type="button"
-                className={`export-format-btn ${format === "csv" ? "active" : ""}`}
+                className={`export-format-pill ${format === "csv" ? "active" : ""}`}
                 onClick={() => setFormat("csv")}
               >
-                <span className="format-title">📊 CSV Spreadsheet (.csv)</span>
-                <span className="format-desc">Excel & Google Sheets ready table format</span>
+                <span className="format-pill-icon">📊</span>
+                <span className="format-pill-text">
+                  <span className="format-title">CSV Spreadsheet</span>
+                  <span className="format-desc">Excel &amp; Sheets ready</span>
+                </span>
               </button>
               <button
                 type="button"
-                className={`export-format-btn ${format === "txt" ? "active" : ""}`}
+                className={`export-format-pill ${format === "txt" ? "active" : ""}`}
                 onClick={() => setFormat("txt")}
               >
-                <span className="format-title">📝 Formatted Text (.txt)</span>
-                <span className="format-desc">Human-readable ledger & audit report</span>
+                <span className="format-pill-icon">📝</span>
+                <span className="format-pill-text">
+                  <span className="format-title">Formatted Text</span>
+                  <span className="format-desc">Human-readable report</span>
+                </span>
               </button>
             </div>
           </div>
 
-          {/* Summary Banner */}
-          <div className="export-summary-box">
+          {/* Summary Banner — receipt-style with a status accent bar instead of a flat neutral box */}
+          <div className={`export-summary-box ${preset === "public_only" ? "is-safe" : "is-secret"}`}>
             <div className="summary-col">
               <span className="summary-sub">READY TO EXPORT</span>
               <span className="summary-main mono">
@@ -207,9 +233,9 @@ export function ExportModal() {
             </div>
             <div className="summary-security-note">
               {preset === "public_only" ? (
-                <span className="text-emerald">✓ Safe: Zero private keys will be exported</span>
+                <span className="security-pill is-safe">✓ Safe — zero private keys exported</span>
               ) : (
-                <span className="text-amber">⚠️ Warning: Contains sensitive decrypted keys</span>
+                <span className="security-pill is-secret">⚠ Contains sensitive decrypted keys</span>
               )}
             </div>
           </div>

@@ -206,7 +206,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
         )}
       </div>
 
-            {/* 2. Step 1: Configuration Form */}
+      {/* 2. Step 1: Configuration Form */}
       <div className="sweeper-control-deck">
         {/* Row 1: Network Selection Bar */}
         <div className="sweeper-network-row">
@@ -227,8 +227,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
           </div>
         </div>
 
-        {/* Row 2: 2-Column Split: Master Destination (62%) & Gas Presets (38%) */}
-                {/* Row 2: 2-Column Split: Master Destination (60%) & Gas Presets (40%) */}
+        {/* Row 2: 2-Column Split — Master Destination (~60%) & Gas Presets (~40%) */}
         <div className="sweeper-inputs-row">
           {/* Destination Vault Input */}
           <div className="sweeper-deck-col col-recipient">

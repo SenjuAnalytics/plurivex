@@ -387,7 +387,11 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                   </button>
                 )}
               </div>
-              <div className="credential-row sol-owner-credential-row">
+
+              {/* On-chain account analysis is a distinct concern from identity/keys above — own sub-section so it doesn't read as "just another credential row" */}
+              <div className="sol-account-analysis">
+                <span className="sol-account-analysis-title">ON-CHAIN ACCOUNT ANALYSIS</span>
+                <div className="credential-row sol-owner-credential-row">
                 <span className="credential-sub-lbl mono">Account Owner:</span>
                 {loadingSolAccount ? (
                   <span className="credential-val mono text-muted text-xs">⏳ Querying Solana on-chain validator…</span>
@@ -430,9 +434,9 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                     </button>
                   </div>
                 ) : null}
-              </div>
+                </div>
 
-              {solAccount && solAccount.authority && (
+                {solAccount && solAccount.authority && (
                 <div className="credential-row">
                   <span className="credential-sub-lbl mono">
                     {solAccount.account_type === "nonce_account" ? "Nonce Authority:" : "Token Owner (Authority):"}
@@ -453,9 +457,9 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                     </button>
                   </div>
                 </div>
-              )}
+                )}
 
-              {solAccount && solAccount.token_mint && (
+                {solAccount && solAccount.token_mint && (
                 <div className="credential-row">
                   <span className="credential-sub-lbl mono">Token Mint:</span>
                   <div className="sol-owner-row">
@@ -474,9 +478,9 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                     </button>
                   </div>
                 </div>
-              )}
+                )}
 
-              {solAccount && !solAccount.is_system_program && (
+                {solAccount && !solAccount.is_system_program && (
                 <div className="sol-non-standard-alert">
                   {solAccount.account_type === "nonce_account" ? (
                     <>
@@ -492,7 +496,8 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                     </>
                   )}
                 </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

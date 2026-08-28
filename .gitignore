@@ -44,3 +44,6 @@ gambar/
 
 # Private Architecture & Internal Docs
 docs/
+
+# Deprecated / dead code staged for removal (not tracked, not shipped)
+_deprecated/

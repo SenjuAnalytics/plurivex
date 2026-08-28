@@ -61,61 +61,69 @@ export function MainApp() {
           </div>
         </div>
 
-        {/* 3. Right: Sleek Action Toolbar */}
+        {/* 3. Right: Sleek Action Toolbar — grouped by intent, not just listed */}
         <div className="app-header-actions">
-          <button
-            type="button"
-            className="btn-action-minimal btn-import-header"
-            onClick={() => setIsImportOpen(true)}
-            title="Import new wallets (Mnemonic Seed / Private Key / JSON)"
-          >
-            <IconWalletImport size={13} />
-            <span>Import</span>
-          </button>
+          <div className="header-action-group">
+            <button
+              type="button"
+              className="btn-action-minimal btn-import-header"
+              onClick={() => setIsImportOpen(true)}
+              title="Import new wallets (Mnemonic Seed / Private Key / JSON)"
+            >
+              <IconWalletImport size={13} />
+              <span>Import</span>
+            </button>
 
-          <button
-            type="button"
-            className="btn-action-minimal btn-scan"
-            onClick={scanAll}
-            disabled={!wallets.length || scanning}
-            title="Scan realtime balances across all networks"
-          >
-            <IconScan size={13} />
-            <span>{scanning ? "Scanning…" : "Scan All"}</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-action-minimal btn-export-preset"
-            onClick={() => setIsExportModalOpen(true)}
-            disabled={!wallets.length}
-            title="Export Vault with Presets (Funded, Public, Full Backup)"
-          >
-            <span>📤 Export Vault</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-action-minimal btn-reset-minimal"
-            onClick={() => setIsResetModalOpen(true)}
-            disabled={!wallets.length}
-            title="Reset All Wallets (Requires Master Password)"
-          >
-            <span>🗑️ Reset All</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn-action-minimal btn-lock-minimal"
-            onClick={lock}
-            title="Lock Application Vault"
-          >
-            <IconLock size={13} />
-          </button>
+            <button
+              type="button"
+              className="btn-action-minimal btn-scan"
+              onClick={scanAll}
+              disabled={!wallets.length || scanning}
+              title="Scan realtime balances across all networks"
+            >
+              <IconScan size={13} />
+              <span>{scanning ? "Scanning…" : "Scan All"}</span>
+            </button>
+          </div>
 
           <div className="header-divider-v" />
 
-          <WindowControls />
+          <div className="header-action-group">
+            <button
+              type="button"
+              className="btn-action-minimal btn-export-preset"
+              onClick={() => setIsExportModalOpen(true)}
+              disabled={!wallets.length}
+              title="Export Vault with Presets (Funded, Public, Full Backup)"
+            >
+              <span>📤 Export Vault</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-action-minimal btn-reset-minimal"
+              onClick={() => setIsResetModalOpen(true)}
+              disabled={!wallets.length}
+              title="Reset All Wallets (Requires Master Password)"
+            >
+              <span>🗑️ Reset All</span>
+            </button>
+          </div>
+
+          <div className="header-divider-v" />
+
+          <div className="header-action-group">
+            <button
+              type="button"
+              className="btn-action-minimal btn-lock-minimal"
+              onClick={lock}
+              title="Lock Application Vault"
+            >
+              <IconLock size={13} />
+            </button>
+
+            <WindowControls />
+          </div>
         </div>
       </header>
 
