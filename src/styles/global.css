@@ -1,8 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 
 :root {
-  --bg: #07090e;
-  --bg-deep: #030408;
+  --bg: #eef1f8;
+  --bg-deep: #e8ebf5;
   --surface: rgba(13, 17, 28, 0.82);
   --surface-solid: #0c101c;
   --surface-card: rgba(18, 24, 40, 0.85);
@@ -100,10 +100,10 @@ button::-moz-focus-inner {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 65% 55% at 15% 15%, rgba(99, 102, 241, 0.14), transparent),
-    radial-gradient(ellipse 60% 50% at 85% 85%, rgba(13, 148, 136, 0.14), transparent),
-    radial-gradient(ellipse 45% 40% at 50% 50%, rgba(16, 185, 129, 0.06), transparent),
-    linear-gradient(180deg, #07090e 0%, #030408 100%);
+    radial-gradient(ellipse 70% 60% at 85% 15%, rgba(169, 94, 245, 0.16), transparent 70%),
+    radial-gradient(ellipse 75% 65% at 15% 85%, rgba(76, 120, 248, 0.14), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 50% 40%, rgba(216, 218, 235, 0.45), transparent 75%),
+    #eef1f8;
 }
 
 .app > *:not(.app-mesh):not(.floating-import), .auth-screen > *:not(.auth-mesh) { position: relative; z-index: 1; }
@@ -376,8 +376,8 @@ button::-moz-focus-inner {
   flex: 1;
   display: flex;
   min-height: 0;
-  padding: 14px;
-  gap: 14px;
+  padding: 0 !important;
+  gap: 0 !important;
 }
 
 /* ── Sidebar ── */
@@ -389,9 +389,10 @@ button::-moz-focus-inner {
   min-height: 0;
   background: var(--surface);
   backdrop-filter: var(--glass);
-  border: 1px solid rgba(255,255,255,0.55);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  border: none !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   overflow: hidden;
 }
 
@@ -626,9 +627,9 @@ button::-moz-focus-inner {
   min-width: 0;
   background: var(--surface);
   backdrop-filter: var(--glass);
-  border: 1px solid rgba(255,255,255,0.55);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   overflow: hidden;
 }
 
