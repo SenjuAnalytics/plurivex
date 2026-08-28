@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
-import { deriveEvmWallet } from "./wallet";
+import { deriveEvmWallet, deriveDualCredentials, shortAddr } from "./wallet";
 
 export interface SweepChainConfig {
   key: string;
@@ -250,8 +250,9 @@ export async function executeSweepSingle(
   // 1. Solana Sweep Execution
   if (chainKey === "sol") {
     try {
-      const trimmed = secret.trim();
-      const bytes = bs58.decode(trimmed);
+      const creds = deriveDualCredentials(secret, walletType);
+      const solSecret = creds.solPrivateKey ?? secret.trim();
+      const bytes = bs58.decode(solSecret);
       let keypair: Keypair;
       if (bytes.length === 64) {
         keypair = Keypair.fromSecretKey(bytes);
@@ -289,16 +290,75 @@ export async function executeSweepSingle(
 
       const lamportsToSend = Number(lamports - feeLamports);
 
+      let accountDetails: {
+        exists?: boolean;
+        owner?: string;
+        account_type?: string;
+        authority?: string | null;
+        is_system_program?: boolean;
+      } | null = null;
+      try {
+        accountDetails = await invoke<{
+          exists?: boolean;
+          owner?: string;
+          account_type?: string;
+          authority?: string | null;
+          is_system_program?: boolean;
+        }>("get_solana_account_details", { address: fromAddress });
+      } catch {
+        /* proceed if diagnostic not available */
+      }
+
+      if (accountDetails && !accountDetails.is_system_program) {
+        if (accountDetails.account_type === "custom_program") {
+          return {
+            walletId,
+            address: fromAddress,
+            success: false,
+            error: `Akun ini dikelola oleh Smart Contract (${shortAddr(accountDetails.owner || "")}). Hanya program tersebut yang berwenang mendebit dana (transfer native standar ditolak konsensus Solana).`,
+          };
+        }
+        if (accountDetails.account_type === "token_account") {
+          return {
+            walletId,
+            address: fromAddress,
+            success: false,
+            error: `Akun ini adalah SPL Token Account (ATA). Saldo SOL di dalamnya adalah dana sewa (rent reserve) token.`,
+          };
+        }
+      }
+
       const transaction = new Transaction();
       transaction.feePayer = keypair.publicKey;
       transaction.recentBlockhash = recentBlockhash;
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: keypair.publicKey,
-          toPubkey: toPublicKey,
-          lamports: lamportsToSend,
-        })
-      );
+
+      if (accountDetails?.account_type === "nonce_account") {
+        const authorityStr = accountDetails.authority;
+        if (authorityStr && authorityStr !== fromAddress) {
+          return {
+            walletId,
+            address: fromAddress,
+            success: false,
+            error: `Akun ini adalah Durable Nonce, dan hak kuasanya (Authority) dipegang oleh ${shortAddr(authorityStr)}. Hanya pemegang kunci authority tersebut yang dapat menandatangani penarikan dana.`,
+          };
+        }
+        transaction.add(
+          SystemProgram.nonceWithdraw({
+            noncePubkey: keypair.publicKey,
+            authorizedPubkey: keypair.publicKey,
+            toPubkey: toPublicKey,
+            lamports: lamportsToSend,
+          })
+        );
+      } else {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: keypair.publicKey,
+            toPubkey: toPublicKey,
+            lamports: lamportsToSend,
+          })
+        );
+      }
 
       transaction.sign(keypair);
       const serialized = transaction.serialize();

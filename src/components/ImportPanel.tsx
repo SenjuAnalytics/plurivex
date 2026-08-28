@@ -3,12 +3,18 @@ import { useApp } from "../context/AppContext";
 import { getExistingFingerprints } from "../lib/db";
 import {
   collectFilesFromDataTransfer,
+  countByType,
   formatBreadcrumb,
   processFilesStreaming,
+  smartNormalizeInput,
   type FileScanReport,
   type ReadImportProgress,
 } from "../lib/extract";
+import { canonicalKey } from "../lib/wallet";
+import { walletFingerprint } from "../lib/fingerprint";
 import { IconFolder, IconImport, IconKey, IconSeed, IconUpload } from "../icons";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 interface ImportPanelProps {
   floating?: boolean;
@@ -18,6 +24,7 @@ interface ImportPanelProps {
 export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
   const { importWallets, toast } = useApp();
   const [raw, setRaw] = useState("");
+  const [stagedWallets, setStagedWallets] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsingType, setParsingType] = useState<"folder" | "file" | "drop" | null>(null);
@@ -28,11 +35,13 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const apply = async () => {
-    if (!raw.trim() || loading || parsing) return;
+    if ((!raw.trim() && (!stagedWallets || !stagedWallets.length)) || loading || parsing) return;
     setLoading(true);
     try {
-      const { added, skipped } = await importWallets(raw);
+      const payload = stagedWallets && stagedWallets.length > 0 ? stagedWallets : raw;
+      const { added, skipped } = await importWallets(payload);
       setRaw("");
+      setStagedWallets(null);
       setScanReport(null);
 
       if (added > 0 && skipped > 0) {
@@ -73,7 +82,19 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
       );
 
       const label = sourceLabel ?? summary.fileReport.folderName ?? `${summary.fileReport.totalFiles} files`;
-      setRaw(summary.wallets.join("\n"));
+      setStagedWallets(summary.wallets);
+
+      const maxPreview = 150;
+      if (summary.wallets.length <= maxPreview) {
+        setRaw(summary.wallets.join("\n"));
+      } else {
+        const preview = summary.wallets.slice(0, maxPreview).join("\n");
+        const hiddenCount = summary.wallets.length - maxPreview;
+        setRaw(
+          preview +
+            `\n\n# ... [${hiddenCount} more wallets discovered from this folder]\n# Click 'Import Wallets' below to import all ${summary.wallets.length} wallets into your vault.`
+        );
+      }
 
       let statusMessage = "";
       let isSuccess = false;
@@ -153,6 +174,164 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
     e.target.value = "";
   };
 
+  const handleNativeFolderPick = async () => {
+    if (parsing || loading) return;
+    try {
+      let folderPath: string | null = null;
+      if (isTauri()) {
+        const selected = await openDialog({
+          directory: true,
+          multiple: false,
+          title: "Select Folder to Scan for Wallets",
+        });
+        if (!selected) return;
+        folderPath = typeof selected === "string" ? selected : selected[0];
+      } else {
+        folderInputRef.current?.click();
+        return;
+      }
+
+      if (!folderPath) return;
+
+      setParsing(true);
+      setParsingType("folder");
+      setScanReport(null);
+      setReadProgress({
+        stage: "traversing",
+        current: 0,
+        total: 0,
+        path: `Scanning ${folderPath}…`,
+      });
+
+      interface NativeFileContent {
+        path: string;
+        content: string;
+      }
+
+      interface NativeScanResult {
+        folder_name: string;
+        total_files_visited: number;
+        text_files_read: number;
+        skipped_count: number;
+        files: NativeFileContent[];
+      }
+
+      const scanRes = await invoke<NativeScanResult>("scan_directory_native", { path: folderPath });
+
+      setReadProgress({
+        stage: "reading",
+        current: 0,
+        total: scanRes.files.length,
+        path: `Parsing ${scanRes.text_files_read} candidate files…`,
+      });
+
+      const existing = await getExistingFingerprints();
+      const uniqueWallets = new Set<string>();
+      const seenFp = new Set<string>(existing);
+      const newWallets: string[] = [];
+      let skippedDuplicate = 0;
+      let lastTime = 0;
+
+      for (let i = 0; i < scanRes.files.length; i++) {
+        const file = scanRes.files[i];
+        const now = performance.now();
+        if (now - lastTime > 80 || i === scanRes.files.length - 1) {
+          lastTime = now;
+          setReadProgress({
+            stage: "reading",
+            current: i + 1,
+            total: scanRes.files.length,
+            path: file.path,
+          });
+          await new Promise((r) => setTimeout(r, 0));
+        }
+
+        const foundInFile = smartNormalizeInput(file.content);
+        for (const wallet of foundInFile) {
+          const canon = canonicalKey(wallet);
+          if (uniqueWallets.has(canon)) continue;
+          uniqueWallets.add(canon);
+
+          const fp = await walletFingerprint(wallet);
+          if (seenFp.has(fp)) {
+            skippedDuplicate++;
+          } else {
+            seenFp.add(fp);
+            newWallets.push(wallet);
+          }
+        }
+      }
+
+      const counts = countByType(newWallets);
+      setStagedWallets(newWallets);
+
+      const maxPreview = 150;
+      if (newWallets.length <= maxPreview) {
+        setRaw(newWallets.join("\n"));
+      } else {
+        const preview = newWallets.slice(0, maxPreview).join("\n");
+        const hiddenCount = newWallets.length - maxPreview;
+        setRaw(
+          preview +
+            `\n\n# ... [${hiddenCount} more wallets discovered from this folder]\n# Click 'Import Wallets' below to import all ${newWallets.length} wallets into your vault.`
+        );
+      }
+
+      let statusMessage = "";
+      let isSuccess = false;
+
+      if (newWallets.length > 0 && skippedDuplicate > 0) {
+        statusMessage = `Deep scan complete: Dissected ${scanRes.total_files_visited.toLocaleString()} files across all subdirectories (including AppData, node_modules, .git). Found ${newWallets.length + skippedDuplicate} wallets (${newWallets.length} new ready to import, ${skippedDuplicate} duplicates).`;
+        isSuccess = true;
+      } else if (newWallets.length > 0) {
+        statusMessage = `Deep scan complete: Dissected ${scanRes.total_files_visited.toLocaleString()} files across all subdirectories (including AppData, node_modules, .git). Found ${newWallets.length} new wallets (${counts.seedCount} Seeds, ${counts.pkCount} EVM PKs, ${counts.solCount} Solana PKs).`;
+        isSuccess = true;
+      } else if (skippedDuplicate > 0) {
+        statusMessage = `Deep scan complete: Dissected ${scanRes.total_files_visited.toLocaleString()} files. All ${skippedDuplicate} wallets found already exist in your vault (duplicates).`;
+        isSuccess = false;
+      } else if (scanRes.text_files_read === 0) {
+        statusMessage = `Deep scan complete: Dissected ${scanRes.total_files_visited.toLocaleString()} files across all subdirectories. No text files containing wallet patterns were detected.`;
+        isSuccess = false;
+      } else {
+        statusMessage = `Deep scan complete: Dissected ${scanRes.total_files_visited.toLocaleString()} files (${scanRes.text_files_read} candidate files inspected). No valid BIP-39 seeds or private keys were found.`;
+        isSuccess = false;
+      }
+
+      setScanReport({
+        folderName: scanRes.folder_name,
+        totalFiles: scanRes.total_files_visited,
+        textCandidateCount: scanRes.text_files_read,
+        textReadCount: scanRes.text_files_read,
+        skippedBinaryCount: scanRes.skipped_count,
+        skippedCorruptCount: 0,
+        unreadableCount: 0,
+        foundWalletsTotal: newWallets.length + skippedDuplicate,
+        newWalletsCount: newWallets.length,
+        duplicateCount: skippedDuplicate,
+        seedCount: counts.seedCount,
+        pkCount: counts.pkCount,
+        solCount: counts.solCount,
+        statusMessage,
+        isSuccess,
+      });
+
+      if (isSuccess) {
+        toast(statusMessage, "success");
+      } else if (skippedDuplicate > 0) {
+        toast("All duplicates — no new wallets found", "info");
+      } else {
+        toast("No valid wallets found", "error");
+      }
+    } catch (err) {
+      console.error("handleNativeFolderPick error:", err);
+      toast(`Scan failed: ${String(err)}`, "error");
+    } finally {
+      setParsing(false);
+      setParsingType(null);
+      setReadProgress(null);
+    }
+  };
+
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     if (parsing || loading) return;
@@ -212,7 +391,7 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
       <button
         type="button"
         className={`btn btn-ghost import-file-btn ${parsing && parsingType === "folder" ? "is-busy" : ""}`}
-        onClick={() => !parsing && !loading && folderInputRef.current?.click()}
+        onClick={() => !parsing && !loading && handleNativeFolderPick()}
         disabled={loading || parsing}
       >
         {parsing && parsingType === "folder" ? (
@@ -368,6 +547,7 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
           disabled={parsing}
           onChange={(e) => {
             setRaw(e.target.value);
+            setStagedWallets(null);
             if (scanReport) setScanReport(null);
           }}
           placeholder=""
@@ -388,9 +568,15 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
         <button
           className="btn btn-primary import-floating-btn"
           onClick={apply}
-          disabled={!raw.trim() || loading || parsing}
+          disabled={(!raw.trim() && (!stagedWallets || !stagedWallets.length)) || loading || parsing}
         >
-          {loading ? "Processing…" : parsing ? "Reading…" : "Import →"}
+          {loading
+            ? "Processing…"
+            : parsing
+            ? "Reading…"
+            : stagedWallets && stagedWallets.length > 0
+            ? `Import ${stagedWallets.length} Wallets →`
+            : "Import →"}
         </button>
       </div>
     </div>

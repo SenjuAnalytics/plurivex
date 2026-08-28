@@ -2,7 +2,6 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
 import { formatSolBalance } from "./solana";
 import type { TokenBalance, WalletType } from "./types";
-import { isSolanaWallet } from "./wallet";
 
 export const CHAINS = [
   {
@@ -83,8 +82,16 @@ export type Chain = (typeof CHAINS)[number];
 export const EVM_CHAINS = CHAINS.filter((c) => c.family === "evm");
 export const SOL_CHAINS = CHAINS.filter((c) => c.family === "solana");
 
-export function chainsForWallet(type: WalletType): readonly Chain[] {
-  return isSolanaWallet(type) ? SOL_CHAINS : EVM_CHAINS;
+export function chainsForWallet(walletOrType?: WalletType | { address?: string | null; solAddress?: string | null; type?: WalletType }): readonly Chain[] {
+  if (!walletOrType) return CHAINS;
+  if (typeof walletOrType === "string") {
+    return CHAINS;
+  }
+  const hasEvm = Boolean(walletOrType.address);
+  const hasSol = Boolean(walletOrType.solAddress);
+  if (hasEvm && hasSol) return CHAINS;
+  if (hasSol && !hasEvm) return SOL_CHAINS;
+  return EVM_CHAINS;
 }
 
 const RPC_TIMEOUT_MS = 12_000;
@@ -198,7 +205,8 @@ export async function fetchBalance(address: string, chain: Chain): Promise<strin
 
 export function balanceAmount(v: string | null | undefined): number {
   if (!v || v === "error" || v === "loading") return 0;
-  const num = parseFloat(v);
+  const clean = v.replace(/^[<>=~]\s*/, "");
+  const num = parseFloat(clean);
   return Number.isFinite(num) ? num : 0;
 }
 
@@ -213,6 +221,35 @@ export function totalBalanceForWallet(
   return sumBalance(balances, chainsForWallet(type));
 }
 
+export function totalBalanceOnEvm(
+  balances: Record<string, string | null>,
+  tokens?: TokenBalance[],
+): number {
+  const evmChains = CHAINS.filter((c) => c.family === "evm");
+  const nativeSum = evmChains.reduce((sum, c) => sum + balanceAmount(balances[c.key]), 0);
+  const tokenSum = (tokens || []).reduce((sum, t) => {
+    if (t.chain.toLowerCase() !== "sol") {
+      return sum + balanceAmount(t.balance);
+    }
+    return sum;
+  }, 0);
+  return nativeSum + tokenSum;
+}
+
+export function totalBalanceOnSol(
+  balances: Record<string, string | null>,
+  tokens?: TokenBalance[],
+): number {
+  const nativeSol = balanceAmount(balances["sol"]);
+  const tokenSol = (tokens || []).reduce((sum, t) => {
+    if (t.chain.toLowerCase() === "sol") {
+      return sum + balanceAmount(t.balance);
+    }
+    return sum;
+  }, 0);
+  return nativeSol + tokenSol;
+}
+
 export function hasFundsForWallet(
   balances: Record<string, string | null>,
   type: WalletType,
@@ -222,6 +259,45 @@ export function hasFundsForWallet(
   if (nativeHasFunds) return true;
   if (tokens && tokens.length > 0) {
     return tokens.some((t) => balanceAmount(t.balance) > 0);
+  }
+  return false;
+}
+
+export function hasFundsOnEvm(
+  balances: Record<string, string | null>,
+  tokens?: TokenBalance[],
+): boolean {
+  const evmChains = CHAINS.filter((c) => c.family === "evm");
+  const nativeHasFunds = evmChains.some((c) => balanceAmount(balances[c.key]) > 0);
+  if (nativeHasFunds) return true;
+  if (tokens && tokens.length > 0) {
+    return tokens.some((t) => t.chain.toLowerCase() !== "sol" && balanceAmount(t.balance) > 0);
+  }
+  return false;
+}
+
+export function hasFundsOnSol(
+  balances: Record<string, string | null>,
+  tokens?: TokenBalance[],
+): boolean {
+  const solHasFunds = balanceAmount(balances["sol"]) > 0;
+  if (solHasFunds) return true;
+  if (tokens && tokens.length > 0) {
+    return tokens.some((t) => t.chain.toLowerCase() === "sol" && balanceAmount(t.balance) > 0);
+  }
+  return false;
+}
+
+export function hasFundsOnChain(
+  chainKey: string,
+  balances: Record<string, string | null>,
+  tokens?: TokenBalance[],
+): boolean {
+  const k = chainKey.toLowerCase();
+  const num = balanceAmount(balances[k]);
+  if (num > 0) return true;
+  if (tokens && tokens.length > 0) {
+    return tokens.some((t) => t.chain.toLowerCase() === k && balanceAmount(t.balance) > 0);
   }
   return false;
 }

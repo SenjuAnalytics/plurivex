@@ -14,5 +14,9 @@ description = "Allow fetching sweep estimates and broadcasting transactions"
 commands.allow = [
   "get_chain_fee_data",
   "get_account_nonce_and_balance",
-  "broadcast_raw_tx"
+  "broadcast_raw_tx",
+  "broadcast_solana_tx",
+  "get_solana_recent_blockhash",
+  "get_solana_account_details",
+  "scan_directory_native"
 ]

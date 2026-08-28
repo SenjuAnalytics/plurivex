@@ -9,7 +9,7 @@ import {
   type SweepTxResult,
 } from "../lib/sweeper";
 import { formatCompactBalance } from "../lib/chains";
-import { isEvmWallet, isSolanaWallet, shortAddr } from "../lib/wallet";
+import { shortAddr } from "../lib/wallet";
 import { ethers } from "ethers";
 import { PublicKey } from "@solana/web3.js";
 import { ChainIcon } from "../icons";
@@ -24,7 +24,7 @@ function isValidSolAddress(addr: string): boolean {
 }
 
 function getWalletTargetAddr(w: { address: string | null; solAddress: string | null }, isEvm: boolean): string {
-  return (isEvm ? w.address : (w.solAddress || w.address)) ?? "";
+  return (isEvm ? w.address : w.solAddress) ?? "";
 }
 
 export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
@@ -59,15 +59,15 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
     return wallets.filter((w) => {
       if (!selectedSweepIds.has(w.id)) return false;
       if (isEvmChain) {
-        return isEvmWallet(w.type) && !!w.address;
+        return !!w.address;
       } else {
-        return isSolanaWallet(w.type) && !!w.solAddress;
+        return !!w.solAddress;
       }
     });
   }, [wallets, selectedSweepIds, isEvmChain]);
 
   const activeFamilyFundedCount = useMemo(() => {
-    return wallets.filter((w) => w.hasFunds && (isEvmChain ? isEvmWallet(w.type) : isSolanaWallet(w.type))).length;
+    return wallets.filter((w) => w.hasFunds && (isEvmChain ? !!w.address : !!w.solAddress)).length;
   }, [wallets, isEvmChain]);
 
   // Load live fee data when chain changes

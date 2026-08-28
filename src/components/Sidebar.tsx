@@ -1,7 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { isEvmWallet, isSolanaWallet, shortAddr, walletDisplayAddress } from "../lib/wallet";
-import { formatCompactBalance } from "../lib/chains";
+import { isEvmWallet, isSolanaWallet, shortAddr } from "../lib/wallet";
+import {
+  formatCompactBalance,
+  hasFundsOnEvm,
+  hasFundsOnSol,
+  hasFundsOnChain,
+  totalBalanceOnEvm,
+  totalBalanceOnSol,
+  balanceAmount,
+} from "../lib/chains";
 import type { WalletView } from "../lib/types";
 import { IconSearch, IconSeed, IconKey } from "../icons";
 import { ChainIcon } from "../icons/ChainIcon";
@@ -63,6 +71,8 @@ const WalletRow = memo(function WalletRow({
   selected,
   sweepChecked,
   hideCheckbox,
+  filterScope = "all",
+  targetChain = "all",
   onSelect,
   onToggleSweep,
 }: {
@@ -71,10 +81,11 @@ const WalletRow = memo(function WalletRow({
   index: number;
   selected: boolean;
   sweepChecked: boolean;
+  filterScope?: Filter;
+  targetChain?: string;
   onSelect: (id: number) => void;
   onToggleSweep: (id: number) => void;
 }) {
-  const display = walletDisplayAddress(wallet);
   const handleSelect = useCallback(() => onSelect(wallet.id), [onSelect, wallet.id]);
   const handleToggle = useCallback(() => onToggleSweep(wallet.id), [onToggleSweep, wallet.id]);
 
@@ -89,16 +100,27 @@ const WalletRow = memo(function WalletRow({
     solana: 180,
   };
 
-  // 1. Gather all positive native chain balances (ETH, BNB, SOL, etc.)
+  // 1. Gather all positive native chain balances (STRICTLY scoped to active tab filter & target chain)
   const nativeBalances = Object.entries(wallet.balances)
-    .filter(([_, val]) => {
+    .filter(([chainKey, val]) => {
       if (!val || val === "loading" || val === "error") return false;
-      const num = parseFloat(val.split(" ")[0]);
-      return num > 0;
+      const num = balanceAmount(val);
+      if (num <= 0) return false;
+
+      // If user selected a specific target chain (e.g. "bsc" or "sol" or "eth")
+      if (targetChain && targetChain !== "all") {
+        return chainKey.toLowerCase() === targetChain.toLowerCase();
+      }
+
+      // In EVM tab, strictly exclude Solana!
+      if (filterScope === "evm" && chainKey.toLowerCase() === "sol") return false;
+      // In SOL tab, strictly exclude EVM chains!
+      if (filterScope === "sol" && chainKey.toLowerCase() !== "sol") return false;
+      return true;
     })
     .map(([chainKey, val]) => {
       const safeVal = val ?? "";
-      const num = parseFloat(safeVal.split(" ")[0]) || 0;
+      const num = balanceAmount(safeVal);
       const rate = approximateUsdRate[chainKey.toLowerCase()] || 1;
       return {
         key: `native-${chainKey}`,
@@ -112,11 +134,19 @@ const WalletRow = memo(function WalletRow({
     })
     .sort((a, b) => b.estimatedUsd - a.estimatedUsd || b.num - a.num);
 
-  // 2. Gather all positive token holdings (ERC-20, SPL, etc.)
+  // 2. Gather all positive token holdings (STRICTLY scoped to active tab filter & target chain)
   const tokenBalances = (wallet.tokens || [])
     .filter((tok) => {
       const num = parseFloat(tok.balance);
-      return !isNaN(num) && num > 0;
+      if (isNaN(num) || num <= 0) return false;
+
+      if (targetChain && targetChain !== "all") {
+        return tok.chain.toLowerCase() === targetChain.toLowerCase();
+      }
+
+      if (filterScope === "evm" && tok.chain.toLowerCase() === "sol") return false;
+      if (filterScope === "sol" && tok.chain.toLowerCase() !== "sol") return false;
+      return true;
     })
     .map((tok) => {
       const num = parseFloat(tok.balance) || 0;
@@ -134,16 +164,53 @@ const WalletRow = memo(function WalletRow({
   // NATIVE COIN ALWAYS HAS PRIMARY PRIORITY ON THE CARD
   const primaryHolding = nativeBalances[0] || tokenBalances[0] || null;
 
+  // SYNCHRONIZED ADDRESS RESOLUTION:
+  // Address MUST ALWAYS match the exact network family of the balance being highlighted!
+  let displayAddress: string | null = null;
+
+  if (targetChain === "sol" || filterScope === "sol") {
+    displayAddress = wallet.solAddress ?? wallet.address;
+  } else if ((targetChain && targetChain !== "all") || filterScope === "evm") {
+    displayAddress = wallet.address ?? wallet.solAddress;
+  } else {
+    // In "all" or "funded" tab:
+    // If the top holding is on Solana, display Solana address!
+    // If the top holding is on EVM, display EVM address!
+    if (primaryHolding && primaryHolding.chainKey.toLowerCase() === "sol") {
+      displayAddress = wallet.solAddress ?? wallet.address;
+    } else {
+      displayAddress = wallet.address ?? wallet.solAddress;
+    }
+  }
+
   // Extra items for tooltip (+N)
   const remainingNative = nativeBalances.slice(primaryHolding && !primaryHolding.isToken ? 1 : 0);
   const remainingTokens = tokenBalances.slice(primaryHolding && primaryHolding.isToken ? 1 : 0);
   const totalExtraCount = remainingNative.length + remainingTokens.length;
 
+  const isFundedInScope = useMemo(() => {
+    if (filterScope === "evm") {
+      return hasFundsOnEvm(wallet.balances, wallet.tokens);
+    }
+    if (filterScope === "sol") {
+      return hasFundsOnChain("sol", wallet.balances, wallet.tokens);
+    }
+    if (targetChain && targetChain !== "all") {
+      return hasFundsOnChain(targetChain, wallet.balances, wallet.tokens);
+    }
+    return wallet.hasFunds;
+  }, [filterScope, targetChain, wallet.balances, wallet.tokens, wallet.hasFunds]);
+
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div
       className={`wallet-card-row${selected ? " active" : ""}${
-        wallet.hasFunds ? " has-funds" : ""
+        isFundedInScope ? " has-funds" : ""
       }${sweepChecked ? " is-checked" : ""}`}
+      style={isHovered ? { zIndex: 1000 } : undefined}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={handleSelect}
     >
       {!hideCheckbox && (
@@ -160,20 +227,25 @@ const WalletRow = memo(function WalletRow({
         <div className="card-slot-top">
           <div className="card-addr-group">
             <span className="card-idx mono">#{String(index).padStart(2, "0")}</span>
-            <span className="card-addr mono" title={display || undefined}>
-              {display ? shortAddr(display) : "invalid"}
+            <span className="card-addr mono" title={displayAddress || undefined}>
+              {displayAddress ? shortAddr(displayAddress) : "invalid"}
             </span>
+            {wallet.label && (
+              <span className={`card-tag-pill tag-${wallet.label.toLowerCase()}`}>
+                {wallet.label}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="card-slot-sub">
-          <span className={`card-type-tag tag-${wallet.type}`}>
-            {wallet.type === "seed" ? "SEED" : wallet.type === "pk" ? "EVM" : "SOL"}
+          <span className={`card-type-tag tag-${wallet.address && wallet.solAddress ? "dual" : wallet.type}`}>
+            {wallet.address && wallet.solAddress ? "DUAL" : wallet.type === "seed" ? "SEED" : wallet.type === "pk" ? "EVM" : "SOL"}
           </span>
 
           <div className="card-bals-cluster">
             {!primaryHolding ? (
-              <span className="card-sub-idle">0 assets</span>
+              <span className="card-sub-idle mono">0 assets</span>
             ) : (
               <div className="card-single-primary-wrap">
                 <span className="card-bal-badge">
@@ -227,8 +299,6 @@ const WalletRow = memo(function WalletRow({
           </div>
         </div>
       </div>
-
-      {wallet.hasFunds && <span className="card-fund-dot" title="Active funded asset" />}
     </div>
   );
 });
@@ -245,29 +315,95 @@ export function Sidebar() {
     toggleSweepSelection,
     selectAllFunded,
     clearSweepSelection,
+    tagFilter,
+    setTagFilter,
   } = useApp();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const evmWallets = useMemo(
-    () => filteredWallets.filter((w) => isEvmWallet(w.type)),
-    [filteredWallets],
+  const existingTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of wallets) {
+      if (w.label?.trim()) set.add(w.label.trim());
+    }
+    return Array.from(set);
+  }, [wallets]);
+
+  const evmWallets = useMemo(() => {
+    const arr = filteredWallets.filter((w) => Boolean(w.address));
+    return arr.slice().sort((a, b) => {
+      const aFunds = hasFundsOnEvm(a.balances, a.tokens);
+      const bFunds = hasFundsOnEvm(b.balances, b.tokens);
+      if (aFunds !== bFunds) return bFunds ? 1 : -1;
+      if (aFunds && bFunds) {
+        const balA = totalBalanceOnEvm(a.balances, a.tokens);
+        const balB = totalBalanceOnEvm(b.balances, b.tokens);
+        if (balB !== balA) return balB - balA;
+      }
+      return a.id - b.id;
+    });
+  }, [filteredWallets]);
+
+  const solWallets = useMemo(() => {
+    const arr = filteredWallets.filter((w) => Boolean(w.solAddress));
+    return arr.slice().sort((a, b) => {
+      const aFunds = hasFundsOnSol(a.balances, a.tokens);
+      const bFunds = hasFundsOnSol(b.balances, b.tokens);
+      if (aFunds !== bFunds) return bFunds ? 1 : -1;
+      if (aFunds && bFunds) {
+        const balA = totalBalanceOnSol(a.balances, a.tokens);
+        const balB = totalBalanceOnSol(b.balances, b.tokens);
+        if (balB !== balA) return balB - balA;
+      }
+      return a.id - b.id;
+    });
+  }, [filteredWallets]);
+
+  const [chainFilter, setChainFilter] = useState<string>("all");
+
+  const bscFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("bsc", w.balances, w.tokens)).length,
+    [wallets],
   );
-  const solWallets = useMemo(
-    () => filteredWallets.filter((w) => isSolanaWallet(w.type)),
-    [filteredWallets],
+  const solFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("sol", w.balances, w.tokens)).length,
+    [wallets],
+  );
+  const ethFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("eth", w.balances, w.tokens)).length,
+    [wallets],
+  );
+  const baseFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("base", w.balances, w.tokens)).length,
+    [wallets],
+  );
+  const arbFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("arb", w.balances, w.tokens)).length,
+    [wallets],
   );
 
   const list = useMemo(() => {
-    if (filter === "funded") return filteredWallets.filter((w) => w.hasFunds);
+    if (filter === "funded") {
+      let res = filteredWallets.filter((w) => w.hasFunds);
+      if (chainFilter !== "all") {
+        res = res.filter((w) => hasFundsOnChain(chainFilter, w.balances, w.tokens));
+        if (chainFilter === "sol") {
+          return res.slice().sort((a, b) => totalBalanceOnSol(b.balances, b.tokens) - totalBalanceOnSol(a.balances, a.tokens));
+        } else {
+          return res.slice().sort((a, b) => balanceAmount(b.balances[chainFilter]) - balanceAmount(a.balances[chainFilter]));
+        }
+      }
+      return res;
+    }
     if (filter === "evm") return evmWallets;
     if (filter === "sol") return solWallets;
     return filteredWallets;
-  }, [filter, filteredWallets, evmWallets, solWallets]);
+  }, [filter, chainFilter, filteredWallets, evmWallets, solWallets]);
 
-  const showGrouped = filter === "all" && !search.trim();
   const fundedCount = useMemo(() => wallets.filter((w) => w.hasFunds).length, [wallets]);
-  const evmFundedCount = useMemo(() => evmWallets.filter((w) => w.hasFunds).length, [evmWallets]);
-  const solFundedCount = useMemo(() => solWallets.filter((w) => w.hasFunds).length, [solWallets]);
+  const evmFundedCount = useMemo(
+    () => wallets.filter((w) => Boolean(w.address) && hasFundsOnEvm(w.balances, w.tokens)).length,
+    [wallets],
+  );
   const activeScopeFundedCount = filter === "evm" ? evmFundedCount : filter === "sol" ? solFundedCount : fundedCount;
   const isAllFundedSelected = activeScopeFundedCount > 0 && selectedSweepIds.size >= activeScopeFundedCount;
   const selectedFamily = useMemo<"evm" | "sol" | null>(() => {
@@ -287,34 +423,13 @@ export function Sidebar() {
   }, [toggleSweepSelection]);
 
   const items: ListItem[] = useMemo(() => {
-    if (showGrouped) {
-      const res: ListItem[] = [];
-      if (evmWallets.length > 0) {
-        res.push({ type: "header", id: "header-evm", title: "EVM NETWORKS", count: evmWallets.length });
-        for (let i = 0; i < evmWallets.length; i++) {
-          res.push({ type: "wallet", id: evmWallets[i].id, wallet: evmWallets[i], index: i + 1 });
-        }
-      }
-      if (solWallets.length > 0) {
-        res.push({ type: "header", id: "header-sol", title: "SOLANA NETWORK", count: solWallets.length });
-        for (let i = 0; i < solWallets.length; i++) {
-          res.push({
-            type: "wallet",
-            id: solWallets[i].id,
-            wallet: solWallets[i],
-            index: evmWallets.length + i + 1,
-          });
-        }
-      }
-      return res;
-    }
     return list.map((w, i) => ({
       type: "wallet",
       id: w.id,
       wallet: w,
       index: i + 1,
     }));
-  }, [showGrouped, evmWallets, solWallets, list]);
+  }, [list]);
 
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(750);
@@ -336,15 +451,17 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-head">
         <div className="sidebar-title-row">
-          <h2>Wallets Directory</h2>
-          <span className="count-badge mono">{wallets.length}</span>
+          <div className="sidebar-title-left">
+            <h2>Wallets Directory</h2>
+            <span className="count-badge mono">{wallets.length.toLocaleString()}</span>
+          </div>
         </div>
 
         <div className="search-wrap">
           <IconSearch className="search-icon" />
           <input
             className="search-input"
-            placeholder="Search address or secret…"
+            placeholder="Search address, label, secret…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -354,31 +471,143 @@ export function Sidebar() {
           <button
             type="button"
             className={`filter-tab${filter === "all" ? " active" : ""}`}
-            onClick={() => setFilter("all")}
+            onClick={() => {
+              setFilter("all");
+              setChainFilter("all");
+            }}
           >
-            All ({wallets.length})
+            All <span className="tab-pill-count">{wallets.length.toLocaleString()}</span>
           </button>
           <button
             type="button"
             className={`filter-tab funded-tab${filter === "funded" ? " active" : ""}`}
             onClick={() => setFilter("funded")}
           >
-            💰 Funded ({fundedCount})
+            Funded <span className="tab-pill-count funded-pill">{fundedCount}</span>
           </button>
           <button
             type="button"
             className={`filter-tab${filter === "evm" ? " active" : ""}`}
-            onClick={() => setFilter("evm")}
+            onClick={() => {
+              setFilter("evm");
+              setChainFilter("all");
+            }}
           >
-            EVM ({evmWallets.length})
+            EVM
           </button>
           <button
             type="button"
             className={`filter-tab${filter === "sol" ? " active" : ""}`}
-            onClick={() => setFilter("sol")}
+            onClick={() => {
+              setFilter("sol");
+              setChainFilter("all");
+            }}
           >
-            SOL ({solWallets.length})
+            SOL
           </button>
+        </div>
+
+        {/* Chain-Specific Quick Filter: ONLY shown when on Funded Tab */}
+        {filter === "funded" && (
+          <div className="chain-filter-scroll">
+            <button
+              type="button"
+              className={`chain-pill ${chainFilter === "all" ? "active" : ""}`}
+              onClick={() => setChainFilter("all")}
+            >
+              All Funded ({fundedCount})
+            </button>
+            <button
+              type="button"
+              className={`chain-pill chain-pill-bsc ${chainFilter === "bsc" ? "active" : ""}`}
+              onClick={() => setChainFilter(chainFilter === "bsc" ? "all" : "bsc")}
+            >
+              🟡 BNB ({bscFundedCount})
+            </button>
+            <button
+              type="button"
+              className={`chain-pill chain-pill-sol ${chainFilter === "sol" ? "active" : ""}`}
+              onClick={() => setChainFilter(chainFilter === "sol" ? "all" : "sol")}
+            >
+              🟣 SOL ({solFundedCount})
+            </button>
+            <button
+              type="button"
+              className={`chain-pill chain-pill-eth ${chainFilter === "eth" ? "active" : ""}`}
+              onClick={() => setChainFilter(chainFilter === "eth" ? "all" : "eth")}
+            >
+              💠 ETH ({ethFundedCount})
+            </button>
+            {baseFundedCount > 0 && (
+              <button
+                type="button"
+                className={`chain-pill chain-pill-base ${chainFilter === "base" ? "active" : ""}`}
+                onClick={() => setChainFilter(chainFilter === "base" ? "all" : "base")}
+              >
+                🔵 Base ({baseFundedCount})
+              </button>
+            )}
+            {arbFundedCount > 0 && (
+              <button
+                type="button"
+                className={`chain-pill chain-pill-arb ${chainFilter === "arb" ? "active" : ""}`}
+                onClick={() => setChainFilter(chainFilter === "arb" ? "all" : "arb")}
+              >
+                🔷 Arb ({arbFundedCount})
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Tag / Folder Directory Scroll Bar */}
+        <div className="tag-filter-scroll">
+          <button
+            type="button"
+            className={`tag-pill ${tagFilter === null ? "active" : ""}`}
+            onClick={() => setTagFilter(null)}
+          >
+            All Tags
+          </button>
+          <button
+            type="button"
+            className={`tag-pill tag-pill-main ${tagFilter?.toLowerCase() === "main" ? "active" : ""}`}
+            onClick={() => setTagFilter(tagFilter?.toLowerCase() === "main" ? null : "main")}
+          >
+            ⭐ Main
+          </button>
+          <button
+            type="button"
+            className={`tag-pill tag-pill-airdrop ${tagFilter?.toLowerCase() === "airdrop" ? "active" : ""}`}
+            onClick={() => setTagFilter(tagFilter?.toLowerCase() === "airdrop" ? null : "airdrop")}
+          >
+            🪂 Airdrop
+          </button>
+          <button
+            type="button"
+            className={`tag-pill tag-pill-whales ${tagFilter?.toLowerCase() === "whales" ? "active" : ""}`}
+            onClick={() => setTagFilter(tagFilter?.toLowerCase() === "whales" ? null : "whales")}
+          >
+            🐋 Whales
+          </button>
+          <button
+            type="button"
+            className={`tag-pill tag-pill-burner ${tagFilter?.toLowerCase() === "burner" ? "active" : ""}`}
+            onClick={() => setTagFilter(tagFilter?.toLowerCase() === "burner" ? null : "burner")}
+          >
+            🔥 Burner
+          </button>
+          {existingTags
+            .filter((t) => !["main", "airdrop", "whales", "burner"].includes(t.toLowerCase()))
+            .map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`tag-pill ${tagFilter?.toLowerCase() === t.toLowerCase() ? "active" : ""}`}
+                onClick={() => setTagFilter(tagFilter?.toLowerCase() === t.toLowerCase() ? null : t)}
+              >
+                🏷️ {t}
+              </button>
+            ))}
         </div>
 
         {/* Batch Selection Toolbar */}
@@ -461,6 +690,8 @@ export function Sidebar() {
                     index={item.index}
                     selected={selectedId === w.id}
                     sweepChecked={selectedSweepIds.has(w.id)}
+                    filterScope={filter}
+                    targetChain={filter === "funded" ? chainFilter : "all"}
                     hideCheckbox={
                       selectedFamily !== null &&
                       (selectedFamily === "evm" ? !isEvmWallet(w.type) : !isSolanaWallet(w.type))

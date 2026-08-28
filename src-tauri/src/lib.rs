@@ -76,7 +76,9 @@ pub fn run() {
             commands::get_account_nonce_and_balance,
             commands::broadcast_raw_tx,
             commands::broadcast_solana_tx,
-            commands::get_solana_recent_blockhash
+            commands::get_solana_recent_blockhash,
+            commands::get_solana_account_details,
+            commands::scan_directory_native
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

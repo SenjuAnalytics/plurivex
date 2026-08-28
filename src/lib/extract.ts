@@ -35,10 +35,11 @@ function isValidSeed(phrase: string): boolean {
 }
 
 function tokenizeWords(text: string): string[] {
+  const safeText = text.length > 500_000 ? text.slice(0, 500_000) : text;
   const words: string[] = [];
   const re = /[a-zA-Z]+/g;
   let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
+  while ((match = re.exec(safeText)) !== null) {
     words.push(match[0].toLowerCase());
   }
   return words;
@@ -245,7 +246,7 @@ export function smartNormalizeInput(raw: string): string[] {
   return dedupeWallets([...fromDeep, ...fromLines].filter(isValidWalletEntry));
 }
 
-function countByType(wallets: string[]) {
+export function countByType(wallets: string[]) {
   let seedCount = 0;
   let pkCount = 0;
   let solCount = 0;
@@ -303,8 +304,39 @@ const BINARY_MIME = [
   /^application\/vnd\./,
 ];
 
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".svn",
+  ".hg",
+  "dist",
+  "build",
+  "target",
+  "bin",
+  "obj",
+  ".cache",
+  ".vscode",
+  ".idea",
+  "vendor",
+  "coverage",
+  "__pycache__",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  "pods",
+  "tmp",
+  "temp",
+  "appdata",
+  "windows",
+  "program files",
+  "program files (x86)",
+  "$recycle.bin",
+  "system volume information",
+]);
+
 const BINARY_EXT =
-  /\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|rar|7z|exe|dll|msi|db|sqlite|wasm|mp3|mp4|avi|mov|bin|dmg|apk|docx|xlsx|pptx|css|scss|sass|less|map|ts|tsx|jsx|vue|svelte|lock|woff2?|ttf|eot)$/i;
+  /\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|rar|7z|gz|tar|tgz|bz2|xz|exe|dll|dylib|so|bin|msi|deb|rpm|dmg|apk|ipa|iso|img|db|sqlite|sqlite3|wasm|mp3|mp4|avi|mov|mkv|wav|flac|ogg|docx|xlsx|pptx|lock|lockb|tsbuildinfo|map|d\.ts|woff2?|ttf|eot|otf|cur|css|scss|sass|less)$/i;
 
 const TEXT_EXT =
   /\.(txt|csv|json|log|md|tsv|xml|html?|env|key|seed|wallet|bak|dat|asc|note|yml|yaml|ini|conf|sh|bat|ps1|rtf)$/i;
@@ -349,19 +381,40 @@ export function looksLikeTextContent(text: string): boolean {
 export function isTextImportFile(file: File): boolean {
   const name = file.name.trim();
   if (!name) return false;
+
+  // 1. Ignore junk directories in relative path (node_modules, .git, build, etc.)
+  const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath?.trim();
+  if (rel) {
+    const parts = rel.toLowerCase().split(/[\\/]/);
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (IGNORED_DIRS.has(parts[i])) return false;
+    }
+  }
+
+  // 2. Reject binary extensions
   if (BINARY_EXT.test(name)) return false;
 
+  // 3. Reject minified or chunk bundles
+  if (/\.(min|bundle|chunk)\.[a-z0-9]+$/i.test(name)) return false;
+
+  // 4. Reject binary mime types
   const mime = file.type.trim().toLowerCase();
-  if (mime.startsWith("text/")) return true;
-  if (mime === "application/json" || mime === "application/xml" || mime === "application/javascript") {
-    return true;
-  }
   if (mime && BINARY_MIME.some((rule) => rule.test(mime))) return false;
 
+  // 5. Accept standard text extensions
   if (TEXT_EXT.test(name)) return true;
-  if (!hasFileExtension(name)) return true;
 
-  return true;
+  // 6. Accept small extensionless files (< 256 KB)
+  if (!hasFileExtension(name)) {
+    return file.size <= 256 * 1024;
+  }
+
+  // 7. Accept text/ or json mime types under 512 KB
+  if (mime.startsWith("text/") || mime === "application/json" || mime === "application/xml") {
+    return file.size <= 512 * 1024;
+  }
+
+  return false;
 }
 
 function fileDisplayName(file: File): string {
@@ -457,32 +510,7 @@ export interface FileScanReport {
   isSuccess: boolean;
 }
 
-const IGNORED_DIRS = new Set([
-  "node_modules",
-  ".git",
-  ".svn",
-  ".hg",
-  "dist",
-  "build",
-  "target",
-  "bin",
-  "obj",
-  ".cache",
-  ".vscode",
-  ".idea",
-  "vendor",
-  "coverage",
-  "__pycache__",
-  ".next",
-  ".nuxt",
-  ".svelte-kit",
-  ".turbo",
-  "pods",
-  "tmp",
-  "temp",
-]);
-
-const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB max per text file
+const MAX_FILE_SIZE_BYTES = 512 * 1024; // 512 KB max per text file
 
 async function traverseFileSystemEntry(
   entry: FileSystemEntryLike,
@@ -490,6 +518,7 @@ async function traverseFileSystemEntry(
   basePath = "",
   onProgress?: (path: string) => void,
 ): Promise<void> {
+  if (files.length >= 3000) return;
   try {
     const path = basePath ? `${basePath}/${entry.name}` : entry.name;
     onProgress?.(path);
@@ -553,29 +582,33 @@ export async function processFilesStreaming(
   onProgress?: (progress: ReadImportProgress) => void,
 ) {
   const all = Array.from(files);
-  const candidates = all.filter(isTextImportFile);
+  const maxCandidates = 5000;
+  const filtered = all.filter(isTextImportFile);
+  const candidates = filtered.slice(0, maxCandidates);
   const uniqueWallets = new Set<string>();
   const seenFp = new Set<string>(existingFingerprints);
   const newWallets: string[] = [];
 
   let skippedDuplicate = 0;
   let textReadCount = 0;
-  let skippedBinaryCount = all.length - candidates.length;
+  let skippedBinaryCount = all.length - filtered.length;
   let skippedCorruptCount = 0;
   let unreadableCount = 0;
+  let lastProgressTime = 0;
 
   for (let i = 0; i < candidates.length; i++) {
     const file = candidates[i];
     const label = fileDisplayName(file);
 
-    onProgress?.({
-      stage: "reading",
-      current: i + 1,
-      total: candidates.length,
-      path: label,
-    });
-
-    if (i % 5 === 0) {
+    const now = performance.now();
+    if (now - lastProgressTime > 80 || i === candidates.length - 1) {
+      lastProgressTime = now;
+      onProgress?.({
+        stage: "reading",
+        current: i + 1,
+        total: candidates.length,
+        path: label,
+      });
       await new Promise((r) => setTimeout(r, 0));
     }
 

@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useApp } from "../context/AppContext";
 import { balanceAmount, chainsForWallet, formatCompactBalance, type Chain } from "../lib/chains";
 import type { WalletView } from "../lib/types";
-import { derivePrivateKeyFromSecret, isSolanaWallet, walletDisplayAddress, walletHasScanTarget } from "../lib/wallet";
+import {
+  deriveDualCredentials,
+  walletHasScanTarget,
+  shortAddr,
+} from "../lib/wallet";
 import { IconScan, ChainIcon } from "../icons";
 import { SweeperWorkspace } from "./SweeperWorkspace";
 import { DexBatchTrader } from "./DexBatchTrader";
@@ -36,22 +41,44 @@ function BalanceCard({ chain, value }: { chain: Chain; value: string | null }) {
   );
 }
 
+interface SolanaAccountDetails {
+  exists: boolean;
+  owner: string;
+  owner_label: string;
+  is_system_program: boolean;
+  account_type: string;
+  authority?: string | null;
+  token_mint?: string | null;
+  lamports: number;
+  sol_balance: number;
+  executable: boolean;
+  space: number;
+}
+
 export function WalletDetail({ wallet }: { wallet: WalletView }) {
   const {
     removeWallet,
     revealSecret,
     scanOne,
     toast,
+    setWalletLabel,
   } = useApp();
   const [activeTab, setActiveTab] = useState<DetailMode>("portfolio");
   const [revealed, setRevealed] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [isEditingTag, setIsEditingTag] = useState(false);
+  const [tagInput, setTagInput] = useState(wallet.label || "");
+  const [solAccount, setSolAccount] = useState<SolanaAccountDetails | null>(null);
+  const [loadingSolAccount, setLoadingSolAccount] = useState(false);
+  const [solAccountError, setSolAccountError] = useState<string | null>(null);
 
   useEffect(() => {
     setRevealed(false);
     setSecret(null);
-  }, [wallet.id]);
+    setIsEditingTag(false);
+    setTagInput(wallet.label || "");
+  }, [wallet.id, wallet.label]);
 
   const toggleReveal = async () => {
     if (revealed) {
@@ -64,21 +91,79 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     setRevealed(true);
   };
 
-  const displayAddr = walletDisplayAddress(wallet);
-  const walletChains = chainsForWallet(wallet.type);
-  const isSol = isSolanaWallet(wallet.type);
-  const derivedPk = secret ? derivePrivateKeyFromSecret(secret, wallet.type) : null;
+  const dualCreds = useMemo(() => {
+    if (!secret) return null;
+    return deriveDualCredentials(secret, wallet.type);
+  }, [secret, wallet.type]);
 
-  const copyAddr = () => {
-    if (!displayAddr) return;
-    navigator.clipboard.writeText(displayAddr);
-    toast("Address copied to clipboard", "success");
+  const evmAddr = wallet.address || dualCreds?.evmAddress;
+  const solAddr = wallet.solAddress || dualCreds?.solAddress;
+  const evmPk = dualCreds?.evmPrivateKey;
+  const solPk = dualCreds?.solPrivateKey;
+  const isSol = Boolean(wallet.solAddress && !wallet.address);
+
+  const fetchSolAccount = useCallback(() => {
+    if (!solAddr) {
+      setSolAccount(null);
+      setSolAccountError(null);
+      return;
+    }
+    setLoadingSolAccount(true);
+    setSolAccountError(null);
+
+    invoke<SolanaAccountDetails>("get_solana_account_details", { address: solAddr })
+      .then((data) => {
+        setSolAccount(data);
+        setSolAccountError(null);
+        setLoadingSolAccount(false);
+      })
+      .catch((err) => {
+        console.error("Failed to get solana account details:", err);
+        setSolAccount(null);
+        setSolAccountError(String(err));
+        setLoadingSolAccount(false);
+      });
+  }, [solAddr]);
+
+  useEffect(() => {
+    fetchSolAccount();
+  }, [fetchSolAccount]);
+
+  const walletChains = chainsForWallet(wallet);
+
+  const copyEvmAddr = () => {
+    if (!evmAddr) return;
+    navigator.clipboard.writeText(evmAddr);
+    toast("EVM Address copied to clipboard", "success");
   };
 
-  const copySecret = () => {
+  const copySolAddr = () => {
+    if (!solAddr) return;
+    navigator.clipboard.writeText(solAddr);
+    toast("Solana Address copied to clipboard", "success");
+  };
+
+  const copyEvmPk = () => {
+    if (!evmPk) return;
+    navigator.clipboard.writeText(evmPk);
+    toast("EVM Private Key copied to clipboard", "success");
+  };
+
+  const copySolPk = () => {
+    if (!solPk) return;
+    navigator.clipboard.writeText(solPk);
+    toast("Solana Private Key copied to clipboard", "success");
+  };
+
+  const copySeed = () => {
     if (!secret) return;
     navigator.clipboard.writeText(secret);
-    toast("Secret key copied to clipboard", "success");
+    toast("Master Seed Phrase copied to clipboard", "success");
+  };
+
+  const saveTag = () => {
+    setWalletLabel(wallet.id, tagInput.trim() || null);
+    setIsEditingTag(false);
   };
 
   const scan = async () => {
@@ -169,14 +254,55 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
           <div className="hero-tags-group">
             <span className="hero-type-badge">
               {wallet.type === "seed"
-                ? "BIP-39 Mnemonic Seed"
+                ? "DUAL BIP-39 SEED"
                 : wallet.type === "pk"
-                  ? "EVM Private Key"
-                  : wallet.type === "sol_pk"
-                    ? "Solana Key"
-                    : "Invalid Key"}
+                  ? "DUAL EVM + SOLANA KEY"
+                  : "SOLANA KEY"}
             </span>
             {wallet.hasFunds && <span className="hero-funded-pill">💰 Funded Asset</span>}
+
+            {/* Folder / Label Tag Manager */}
+            <div className="detail-tag-cluster">
+              {isEditingTag ? (
+                <div className="tag-inline-form">
+                  <input
+                    type="text"
+                    className="tag-input-sm mono"
+                    value={tagInput}
+                    placeholder="Tag name…"
+                    autoFocus
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveTag();
+                      if (e.key === "Escape") setIsEditingTag(false);
+                    }}
+                  />
+                  <button type="button" className="btn-tag-action btn-tag-save" onClick={saveTag}>✓</button>
+                  <button type="button" className="btn-tag-action btn-tag-cancel" onClick={() => setIsEditingTag(false)}>✕</button>
+                </div>
+              ) : (
+                <div className="tag-pills-row">
+                  <button
+                    type="button"
+                    className={`tag-display-btn ${wallet.label ? `tag-${wallet.label.toLowerCase()}` : "tag-none"}`}
+                    onClick={() => { setTagInput(wallet.label || ""); setIsEditingTag(true); }}
+                    title="Click to edit label"
+                  >
+                    {wallet.label ? `🏷️ ${wallet.label}` : "+ Add Tag"}
+                  </button>
+                  {["Main", "Airdrop", "Whales", "Burner"].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`tag-preset-chip ${wallet.label?.toLowerCase() === p.toLowerCase() ? "active" : ""}`}
+                      onClick={() => setWalletLabel(wallet.id, wallet.label?.toLowerCase() === p.toLowerCase() ? null : p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="hero-actions-toolbar">
@@ -187,7 +313,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
               disabled={!walletHasScanTarget(wallet) || scanning}
             >
               <IconScan size={13} />
-              <span>{scanning ? "Scanning…" : "Rescan"}</span>
+              <span>{scanning ? "Scanning…" : "Rescan All"}</span>
             </button>
             <button
               type="button"
@@ -200,71 +326,208 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
           </div>
         </div>
 
-        {/* 2-Column Split: Public Address (Left) & Vault Secret (Right) */}
+        {/* 2-Column Split: EVM Identity (Left) & Solana Identity (Right) */}
         <div className="hero-credentials-grid">
-          <div className="credential-box">
-            <div className="credential-label">{isSol ? "SOLANA PUBLIC ADDRESS" : "EVM PUBLIC ADDRESS"}</div>
-            <div className="credential-content">
-              <span className="credential-val mono" onClick={copyAddr} title="Click to copy full address">
-                {displayAddr ?? "Invalid address"}
-              </span>
-              <button type="button" className="btn-credential-copy" onClick={copyAddr}>
-                Copy
-              </button>
+          {/* EVM Credentials Box */}
+          <div className="credential-box evm-box">
+            <div className="credential-header-bar">
+              <span className="credential-label">EVM IDENTITY (0x ADDRESS)</span>
+              {evmAddr && (
+                <button type="button" className="btn-credential-action" onClick={copyEvmAddr}>
+                  Copy 0x
+                </button>
+              )}
+            </div>
+            <div className="credential-body">
+              <div className="credential-row">
+                <span className="credential-sub-lbl mono">Address:</span>
+                <span className="credential-val mono" onClick={copyEvmAddr} title="Click to copy EVM address">
+                  {evmAddr ?? "Not derived"}
+                </span>
+              </div>
+              <div className="credential-row">
+                <span className="credential-sub-lbl mono">Private Key:</span>
+                <span className="credential-val mono secret-val">
+                  {revealed && evmPk ? evmPk : "••••••••••••••••••••••••••••••••"}
+                </span>
+                {revealed && evmPk && (
+                  <button type="button" className="btn-credential-action" onClick={copyEvmPk}>
+                    Copy PK
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="credential-box">
-            <div className="credential-label">
-              {wallet.type === "seed" ? "MASTER SEED & DERIVED PRIVATE KEY" : "VAULT SECRET ENCRYPTION"}
+          {/* Solana Credentials Box */}
+          <div className="credential-box sol-box">
+            <div className="credential-header-bar">
+              <span className="credential-label">SOLANA IDENTITY (BASE58)</span>
+              {solAddr && (
+                <button type="button" className="btn-credential-action" onClick={copySolAddr}>
+                  Copy Sol
+                </button>
+              )}
             </div>
-            <div className="credential-content-multi">
-              <div className="credential-secret-row">
-                <div className="secret-meta-col">
-                  <span className="secret-type-lbl mono">{wallet.type === "seed" ? "Mnemonic Seed:" : "Private Key:"}</span>
-                  <span className="credential-val mono secret-val">
-                    {revealed && secret ? secret : "••••••••••••••••••••••••••••"}
-                  </span>
-                </div>
-                <div className="credential-actions">
-                  <button type="button" className="btn-credential-reveal" onClick={toggleReveal}>
-                    {revealed ? "🔒 Hide" : "👁️ Reveal"}
-                  </button>
-                  {revealed && secret && (
-                    <button type="button" className="btn-credential-copy" onClick={copySecret}>
-                      Copy {wallet.type === "seed" ? "Seed" : "PK"}
-                    </button>
-                  )}
-                </div>
+            <div className="credential-body">
+              <div className="credential-row">
+                <span className="credential-sub-lbl mono">Address:</span>
+                <span className="credential-val mono" onClick={copySolAddr} title="Click to copy Solana address">
+                  {solAddr ?? "Not derived"}
+                </span>
               </div>
-
-              {/* Derived Child Private Key (Always available if Seed Phrase) */}
-              {wallet.type === "seed" && revealed && derivedPk && (
-                <div className="credential-secret-row derived-row">
-                  <div className="secret-meta-col">
-                    <span className="secret-type-lbl mono text-emerald">Child Private Key (Account #0):</span>
-                    <span className="credential-val mono secret-val text-emerald">
-                      {derivedPk}
-                    </span>
+              <div className="credential-row">
+                <span className="credential-sub-lbl mono">Secret Key:</span>
+                <span className="credential-val mono secret-val">
+                  {revealed && solPk ? solPk : "••••••••••••••••••••••••••••••••"}
+                </span>
+                {revealed && solPk && (
+                  <button type="button" className="btn-credential-action" onClick={copySolPk}>
+                    Copy Sol PK
+                  </button>
+                )}
+              </div>
+              <div className="credential-row sol-owner-credential-row">
+                <span className="credential-sub-lbl mono">Account Owner:</span>
+                {loadingSolAccount ? (
+                  <span className="credential-val mono text-muted text-xs">⏳ Querying Solana on-chain validator…</span>
+                ) : solAccountError ? (
+                  <div className="sol-owner-row">
+                    <span className="credential-val mono text-danger text-xs">⚠️ Query failed: {solAccountError}</span>
+                    <button type="button" className="btn-credential-action" onClick={fetchSolAccount}>
+                      Retry
+                    </button>
                   </div>
-                  <div className="credential-actions">
+                ) : solAccount ? (
+                  <div className="sol-owner-row">
+                    <span
+                      className={`sol-owner-badge ${
+                        solAccount.is_system_program
+                          ? "badge-sys-safe"
+                          : "badge-non-sys-warn"
+                      }`}
+                    >
+                      {solAccount.is_system_program
+                        ? "✓ System Program (Standard EOA)"
+                        : `⚠️ ${solAccount.owner_label}`}
+                    </span>
+                    <span
+                      className="sol-owner-id-code mono"
+                      title={`Owner Program ID: ${solAccount.owner}`}
+                    >
+                      {solAccount.owner}
+                    </span>
                     <button
                       type="button"
-                      className="btn-credential-copy btn-copy-pk"
+                      className="btn-credential-action btn-copy-owner-id"
                       onClick={() => {
-                        navigator.clipboard.writeText(derivedPk);
-                        toast("Derived Private Key copied to clipboard", "success");
+                        navigator.clipboard.writeText(solAccount.owner);
+                        toast("Owner Program ID copied to clipboard", "success");
                       }}
+                      title={`Copy full owner Program ID: ${solAccount.owner}`}
                     >
-                      Copy PK
+                      Copy ID
                     </button>
                   </div>
+                ) : null}
+              </div>
+
+              {solAccount && solAccount.authority && (
+                <div className="credential-row">
+                  <span className="credential-sub-lbl mono">
+                    {solAccount.account_type === "nonce_account" ? "Nonce Authority:" : "Token Owner (Authority):"}
+                  </span>
+                  <div className="sol-owner-row">
+                    <span className="sol-owner-id-code mono" title={solAccount.authority}>
+                      {solAccount.authority}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-credential-action btn-copy-owner-id"
+                      onClick={() => {
+                        navigator.clipboard.writeText(solAccount.authority!);
+                        toast("Authority address copied to clipboard", "success");
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {solAccount && solAccount.token_mint && (
+                <div className="credential-row">
+                  <span className="credential-sub-lbl mono">Token Mint:</span>
+                  <div className="sol-owner-row">
+                    <span className="sol-owner-id-code mono" title={solAccount.token_mint}>
+                      {solAccount.token_mint}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-credential-action btn-copy-owner-id"
+                      onClick={() => {
+                        navigator.clipboard.writeText(solAccount.token_mint!);
+                        toast("Token Mint copied to clipboard", "success");
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {solAccount && !solAccount.is_system_program && (
+                <div className="sol-non-standard-alert">
+                  {solAccount.account_type === "nonce_account" ? (
+                    <>
+                      ⚠️ <b>Durable Nonce Account:</b> Akun ini adalah akun Durable Nonce (ukuran 80 byte). Saldo {solAccount.sol_balance} SOL di dalamnya adalah dana sewa (rent reserve). Transfer native standar akan ditolak validator. Penarikan saldo dapat dilakukan via instruksi <code>nonceWithdraw</code> dengan tanda tangan dari Nonce Authority ({solAccount.authority ? shortAddr(solAccount.authority) : "tertera di atas"}).
+                    </>
+                  ) : solAccount.account_type === "token_account" ? (
+                    <>
+                      ⚠️ <b>SPL Token Account (ATA):</b> Akun ini adalah Token Account / Wrapped SOL. Penarikan saldo sewa SOL memerlukan penutupan akun token via instruksi <code>closeAccount</code> dari Token Program.
+                    </>
+                  ) : (
+                    <>
+                      ⚠️ <b>Custom Program Account:</b> Akun ini dikelola oleh program <code>{solAccount.owner}</code>. Transfer native standar tidak dapat mendebit dana secara langsung.
+                    </>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
 
+        {/* BIP-39 Master Mnemonic Banner (If wallet is seed phrase) */}
+        {wallet.type === "seed" && (
+          <div className="mnemonic-seed-banner">
+            <div className="mnemonic-meta">
+              <span className="mnemonic-title mono">🌱 BIP-39 MASTER SEED PHRASE</span>
+              <span className="mnemonic-content mono">
+                {revealed && secret ? secret : "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"}
+              </span>
+            </div>
+            <div className="mnemonic-actions">
+              <button type="button" className="btn-credential-reveal" onClick={toggleReveal}>
+                {revealed ? "🔒 Hide Vault Secrets" : "👁️ Reveal All Secrets"}
+              </button>
+              {revealed && secret && (
+                <button type="button" className="btn-credential-copy-seed" onClick={copySeed}>
+                  Copy Seed
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reveal Bar for PK Wallets */}
+        {wallet.type !== "seed" && (
+          <div className="pk-reveal-bar">
+            <button type="button" className="btn-credential-reveal" onClick={toggleReveal}>
+              {revealed ? "🔒 Hide Vault Keys" : "👁️ Reveal Private Keys"}
+            </button>
+          </div>
+        )}
+        
         {/* Compact Valuation Bar (Only if positive assets exist) */}
         {totalUsd > 0 && (
           <div className="hero-valuation-strip">

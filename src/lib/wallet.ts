@@ -1,9 +1,23 @@
 import { ethers } from "ethers";
 import { wordlists } from "@ethersproject/wordlists";
-import { isBase58Line, isSolanaKeyStr, normalizeSolSecret } from "./solana";
+import {
+  isBase58Line,
+  isSolanaKeyStr,
+  normalizeSolSecret,
+  deriveSolanaAddress,
+  deriveSolanaFromMnemonic,
+  deriveSolanaFromHex,
+  deriveEvmFromSolanaKey,
+} from "./solana";
 import type { WalletType } from "./types";
 
-export { deriveSolanaAddress, isSolanaKeyStr } from "./solana";
+export {
+  deriveSolanaAddress,
+  isSolanaKeyStr,
+  deriveSolanaFromMnemonic,
+  deriveSolanaFromHex,
+  deriveEvmFromSolanaKey,
+} from "./solana";
 
 const MNEMONIC_LENGTHS = [12, 15, 18, 21, 24];
 
@@ -55,11 +69,11 @@ export function classify(line: string): WalletType | "pk_bad_length" {
   const t = line.trim();
   const hex = t.replace(/^0x/i, "");
   const words = t.split(/\s+/).filter(Boolean);
-  if (words.length === 1 && isSolanaKeyStr(t)) return "sol_pk";
   if (/^[0-9a-fA-F]+$/.test(hex) && words.length === 1) {
     return hex.length === 64 ? "pk" : "pk_bad_length";
   }
   if (MNEMONIC_LENGTHS.includes(words.length) && isValidSeedPhrase(t)) return "seed";
+  if (words.length === 1 && isSolanaKeyStr(t)) return "sol_pk";
   return "invalid";
 }
 
@@ -154,12 +168,16 @@ export function normalizeInput(raw: string): string[] {
 
 export function canonicalKey(text: string): string {
   const t = text.trim();
-  if (isSolanaKeyStr(t)) return `sol:${normalizeSolSecret(t)}`;
   const hex = t.replace(/^0x/i, "");
-  if (/^[0-9a-fA-F]+$/.test(hex) && !/\s/.test(t)) {
+  if (/^[0-9a-fA-F]{64}$/.test(hex) && !/\s/.test(t)) {
     return "pk:" + hex.toLowerCase();
   }
-  return "seed:" + t.toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  const words = t.split(/\s+/).filter(Boolean);
+  if (MNEMONIC_LENGTHS.includes(words.length) && isValidSeedPhrase(t)) {
+    return "seed:" + words.map((w) => w.toLowerCase()).join(" ");
+  }
+  if (isSolanaKeyStr(t)) return `sol:${normalizeSolSecret(t)}`;
+  return "seed:" + words.map((w) => w.toLowerCase()).join(" ");
 }
 
 export function deriveAddress(secret: string, type: WalletType): string | null {
@@ -192,35 +210,102 @@ export function deriveEvmWallet(secret: string, type: WalletType): ethers.Wallet
   return null;
 }
 
+export interface DualCredentials {
+  evmAddress: string | null;
+  solAddress: string | null;
+  evmPrivateKey: string | null;
+  solPrivateKey: string | null;
+}
+
+export function deriveDualCredentials(secret: string, type: WalletType): DualCredentials {
+  const t = secret.trim();
+  let evmAddress: string | null = null;
+  let solAddress: string | null = null;
+  let evmPrivateKey: string | null = null;
+  let solPrivateKey: string | null = null;
+
+  try {
+    if (type === "seed") {
+      // EVM Derivation
+      try {
+        const w = ethers.Wallet.fromMnemonic(t);
+        evmAddress = w.address;
+        evmPrivateKey = w.privateKey;
+      } catch {}
+
+      // Solana Derivation from Mnemonic
+      const sol = deriveSolanaFromMnemonic(t);
+      if (sol) {
+        solAddress = sol.address;
+        solPrivateKey = sol.privateKeyBase58;
+      }
+    } else if (type === "pk") {
+      // EVM Derivation
+      try {
+        const norm = t.replace(/^0x/i, "");
+        const w = new ethers.Wallet("0x" + norm);
+        evmAddress = w.address;
+        evmPrivateKey = "0x" + norm;
+      } catch {}
+
+      // Solana Derivation from 32-byte EVM PK
+      const sol = deriveSolanaFromHex(t);
+      if (sol) {
+        solAddress = sol.address;
+        solPrivateKey = sol.privateKeyBase58;
+      }
+    } else if (type === "sol_pk") {
+      // Solana Key
+      solAddress = deriveSolanaAddress(t);
+      solPrivateKey = t;
+
+      // EVM Derivation from Solana Key bytes
+      const evm = deriveEvmFromSolanaKey(t);
+      if (evm) {
+        evmAddress = evm.address;
+        evmPrivateKey = evm.privateKeyHex;
+      }
+    }
+  } catch (e) {
+    console.warn("Dual derivation error:", e);
+  }
+
+  return {
+    evmAddress,
+    solAddress,
+    evmPrivateKey,
+    solPrivateKey,
+  };
+}
+
 export function derivePrivateKeyFromSecret(secret: string, type: WalletType): string | null {
   try {
-    if (type === "pk") {
-      const norm = secret.trim().replace(/^0x/i, "");
-      return "0x" + norm;
-    }
-    if (type === "seed") {
-      const w = ethers.Wallet.fromMnemonic(secret.trim());
-      return w.privateKey;
-    }
-    if (type === "sol_pk") {
-      return secret.trim();
-    }
+    const creds = deriveDualCredentials(secret, type);
+    return creds.evmPrivateKey ?? creds.solPrivateKey;
   } catch {
     return null;
   }
-  return null;
 }
 
 export function shortAddr(a: string) {
   return a.slice(0, 6) + "…" + a.slice(-4);
 }
 
-export function walletDisplayAddress(wallet: {
-  address: string | null;
-  solAddress: string | null;
-  type: WalletType;
-}): string | null {
-  if (wallet.type === "sol_pk") return wallet.solAddress;
+export function walletDisplayAddress(
+  wallet: {
+    address: string | null;
+    solAddress: string | null;
+    type: WalletType;
+  },
+  preferFamily?: "evm" | "sol",
+): string | null {
+  if (preferFamily === "sol") {
+    return wallet.solAddress ?? wallet.address;
+  }
+  if (preferFamily === "evm") {
+    return wallet.address ?? wallet.solAddress;
+  }
+  if (wallet.type === "sol_pk") return wallet.solAddress ?? wallet.address;
   return wallet.address ?? wallet.solAddress;
 }
 
@@ -237,8 +322,7 @@ export function walletHasScanTarget(wallet: {
   solAddress: string | null;
   type: WalletType;
 }): boolean {
-  if (isSolanaWallet(wallet.type)) return Boolean(wallet.solAddress);
-  return Boolean(wallet.address);
+  return Boolean(wallet.address || wallet.solAddress);
 }
 
 export function maskSecret(secret: string, type: WalletType): string {

@@ -4,6 +4,8 @@ import { Sidebar } from "./Sidebar";
 import { FloatingImport } from "./FloatingImport";
 import { WalletDetail } from "./WalletDetail";
 import { SweeperWorkspace } from "./SweeperWorkspace";
+import { ExportModal } from "./ExportModal";
+import { ResetAllWalletsModal } from "./ResetAllWalletsModal";
 import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport } from "../icons";
 
 export function MainApp() {
@@ -13,12 +15,13 @@ export function MainApp() {
     wallets,
     selectedId,
     scanAll,
-    exportWallets,
     lock,
     scanning,
     scanProgress,
     stopScan,
     fundedCount,
+    setIsExportModalOpen,
+    setIsResetModalOpen,
   } = useApp();
 
   const selected = wallets.find((w) => w.id === selectedId) ?? null;
@@ -86,26 +89,25 @@ export function MainApp() {
             <span>{scanning ? "Scanning…" : "Scan All"}</span>
           </button>
 
-          <div className="btn-group-mini">
-            <button
-              type="button"
-              className="btn-mini-item"
-              onClick={() => exportWallets("txt")}
-              disabled={!wallets.length}
-              title="Export decrypted vault to TXT"
-            >
-              TXT
-            </button>
-            <button
-              type="button"
-              className="btn-mini-item"
-              onClick={() => exportWallets("csv")}
-              disabled={!wallets.length}
-              title="Export decrypted vault to CSV"
-            >
-              CSV
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn-action-minimal btn-export-preset"
+            onClick={() => setIsExportModalOpen(true)}
+            disabled={!wallets.length}
+            title="Export Vault with Presets (Funded, Public, Full Backup)"
+          >
+            <span>📤 Export Vault</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-action-minimal btn-reset-minimal"
+            onClick={() => setIsResetModalOpen(true)}
+            disabled={!wallets.length}
+            title="Reset All Wallets (Requires Master Password)"
+          >
+            <span>🗑️ Reset All</span>
+          </button>
 
           <button
             type="button"
@@ -208,7 +210,7 @@ export function MainApp() {
                     <button
                       type="button"
                       className="action-tile sweep-tile"
-                      onClick={() => exportWallets("txt")}
+                      onClick={() => setIsExportModalOpen(true)}
                       disabled={!wallets.length}
                     >
                       <div className="tile-icon-wrap">📁</div>
@@ -260,6 +262,12 @@ export function MainApp() {
           <span className="footer-meta mono">{wallets.length} Wallets Indexed · SQLite Encrypted · Plurivex v0.1.0</span>
         </div>
       </footer>
+
+      {/* Flexible Vault Exporter Modal */}
+      <ExportModal />
+
+      {/* Security-Gated Reset All Wallets Modal */}
+      <ResetAllWalletsModal />
 
       {/* Floating Draggable Import Window */}
       <FloatingImport open={isImportOpen} onClose={() => setIsImportOpen(false)} />

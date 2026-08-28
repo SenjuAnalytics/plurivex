@@ -225,6 +225,21 @@ export async function deleteWallet(id: number) {
   await database.execute("DELETE FROM wallets WHERE id = $1", [id]);
 }
 
+export async function deleteAllWallets(): Promise<void> {
+  const database = await getDb();
+  try {
+    await database.execute("DELETE FROM token_balances");
+  } catch {
+    /* ignore */
+  }
+  try {
+    await database.execute("DELETE FROM balances");
+  } catch {
+    /* ignore */
+  }
+  await database.execute("DELETE FROM wallets");
+}
+
 export async function getExistingFingerprints(): Promise<Set<string>> {
   const database = await getDb();
   const rows = await database.select<{ fingerprint: string }[]>(
@@ -265,6 +280,16 @@ export async function upgradeWalletToSeed(
     "UPDATE wallets SET type = 'seed', encrypted_secret = $1, fingerprint = $2, word_count = $3 WHERE id = $4",
     [encryptedSecret, fingerprint, wordCount, id],
   );
+}
+
+export async function updateWalletLabel(id: number, label: string | null) {
+  const database = await getDb();
+  await database.execute("UPDATE wallets SET label = $1 WHERE id = $2", [label, id]);
+}
+
+export async function updateWalletAddresses(id: number, address: string | null, solAddress: string | null) {
+  const database = await getDb();
+  await database.execute("UPDATE wallets SET address = $1, sol_address = $2 WHERE id = $3", [address, solAddress, id]);
 }
 
 export async function cleanupDuplicateWallets(): Promise<number> {
