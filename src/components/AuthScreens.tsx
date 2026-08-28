@@ -1,14 +1,22 @@
 import { useState, type ReactNode } from "react";
 import { useApp } from "../context/AppContext";
-import { IconShield, IconWallet, IconLock } from "../icons";
+import { WindowControls } from "./WindowControls";
+import { IconShield, IconLock } from "../icons";
 
 function AuthLayout({ children, title, desc }: { children: ReactNode; title: string; desc: string }) {
   return (
     <div className="auth-screen">
+      <div className="auth-topbar" data-tauri-drag-region>
+        <div className="auth-topbar-brand">
+          <img src="/app-icon.png" alt="Plurivex" className="auth-topbar-logo" />
+          <span className="auth-topbar-title">Plurivex</span>
+        </div>
+        <WindowControls />
+      </div>
       <div className="auth-mesh" aria-hidden />
       <div className="auth-card">
         <div className="auth-brand">
-          <div className="auth-brand-icon"><IconWallet size={22} /></div>
+          <img src="/app-icon.png" alt="Plurivex" className="auth-brand-logo-img" />
           <div>
             <span className="auth-brand-name">Plurivex</span>
             <span className="auth-brand-tag"><IconShield size={11} /> 100% Local</span>

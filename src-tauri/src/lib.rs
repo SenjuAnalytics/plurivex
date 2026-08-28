@@ -78,7 +78,10 @@ pub fn run() {
             commands::broadcast_solana_tx,
             commands::get_solana_recent_blockhash,
             commands::get_solana_account_details,
-            commands::scan_directory_native
+            commands::scan_directory_native,
+            commands::window_minimize,
+            commands::window_toggle_maximize,
+            commands::window_close
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

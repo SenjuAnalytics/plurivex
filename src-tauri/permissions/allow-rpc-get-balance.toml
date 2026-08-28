@@ -18,5 +18,8 @@ commands.allow = [
   "broadcast_solana_tx",
   "get_solana_recent_blockhash",
   "get_solana_account_details",
-  "scan_directory_native"
+  "scan_directory_native",
+  "window_minimize",
+  "window_toggle_maximize",
+  "window_close"
 ]

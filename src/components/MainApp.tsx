@@ -6,6 +6,7 @@ import { WalletDetail } from "./WalletDetail";
 import { SweeperWorkspace } from "./SweeperWorkspace";
 import { ExportModal } from "./ExportModal";
 import { ResetAllWalletsModal } from "./ResetAllWalletsModal";
+import { WindowControls } from "./WindowControls";
 import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport } from "../icons";
 
 export function MainApp() {
@@ -36,14 +37,8 @@ export function MainApp() {
       <header className="app-header" data-tauri-drag-region>
         {/* 1. Left: Minimal Brand & Live Status */}
         <div className="app-header-left">
-          <div className="app-logo-mini">
-            <IconWallet size={14} />
-          </div>
+          <img src="/app-icon.png" alt="Plurivex" className="app-logo-img" />
           <span className="app-title-minimal">Plurivex</span>
-          <span className="live-pill" title="RPC Connected · AES-256 Encrypted Vault">
-            <span className="live-dot" />
-            <span>Vault</span>
-          </span>
         </div>
 
         {/* 2. Center: Minimal Clean Metric Badges */}
@@ -117,6 +112,10 @@ export function MainApp() {
           >
             <IconLock size={13} />
           </button>
+
+          <div className="header-divider-v" />
+
+          <WindowControls />
         </div>
       </header>
 
