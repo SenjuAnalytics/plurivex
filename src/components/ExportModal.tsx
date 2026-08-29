@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useApp } from "../context/AppContext";
+import { IconExport, IconX, IconFolder, IconWallet, IconShield, IconChartPie, IconCheckCircle, IconAlertTriangle } from "../icons";
 
 type ExportPreset = "all" | "funded" | "public_only" | "tagged";
 type ExportFormat = "csv" | "txt";
@@ -60,7 +62,7 @@ export function ExportModal() {
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={() => setIsExportModalOpen(false)}>
       <div
         className="modal-card export-vault-modal"
@@ -69,7 +71,7 @@ export function ExportModal() {
       >
         <div className="modal-header">
           <div className="modal-title-wrap">
-            <span className="modal-title-icon">📤</span>
+            <span className="modal-title-icon"><IconExport size={18} /></span>
             <div>
               <h3 className="modal-title">Flexible Vault Exporter</h3>
               <p className="modal-subtitle">Export credentials and audit balances with custom security presets</p>
@@ -80,7 +82,7 @@ export function ExportModal() {
             className="modal-close-btn"
             onClick={() => setIsExportModalOpen(false)}
           >
-            ✕
+            <IconX size={14} />
           </button>
         </div>
 
@@ -96,7 +98,7 @@ export function ExportModal() {
                 onClick={() => setPreset("all")}
               >
                 <span className="preset-select-dot" aria-hidden />
-                <span className="preset-icon-badge risk-secret">📦</span>
+                <span className="preset-icon-badge risk-secret"><IconFolder size={15} /></span>
                 <div className="preset-row-info">
                   <span className="preset-name">Full Vault Backup</span>
                   <span className="preset-card-desc">
@@ -114,7 +116,7 @@ export function ExportModal() {
                 onClick={() => setPreset("funded")}
               >
                 <span className="preset-select-dot" aria-hidden />
-                <span className="preset-icon-badge risk-secret">💰</span>
+                <span className="preset-icon-badge risk-secret"><IconWallet size={15} /></span>
                 <div className="preset-row-info">
                   <span className="preset-name">Funded Only</span>
                   <span className="preset-card-desc">
@@ -132,7 +134,7 @@ export function ExportModal() {
                 onClick={() => setPreset("public_only")}
               >
                 <span className="preset-select-dot" aria-hidden />
-                <span className="preset-icon-badge risk-safe">🛡️</span>
+                <span className="preset-icon-badge risk-safe"><IconShield size={15} /></span>
                 <div className="preset-row-info">
                   <span className="preset-name">Public Addresses Only</span>
                   <span className="preset-card-desc">
@@ -150,7 +152,7 @@ export function ExportModal() {
                 onClick={() => setPreset("tagged")}
               >
                 <span className="preset-select-dot" aria-hidden />
-                <span className="preset-icon-badge risk-secret">🏷️</span>
+                <span className="preset-icon-badge risk-secret"><IconFolder size={15} /></span>
                 <div className="preset-row-info">
                   <span className="preset-name">Tagged / Folder Only</span>
                   <span className="preset-card-desc">
@@ -203,7 +205,7 @@ export function ExportModal() {
                 className={`export-format-pill ${format === "csv" ? "active" : ""}`}
                 onClick={() => setFormat("csv")}
               >
-                <span className="format-pill-icon">📊</span>
+                <span className="format-pill-icon"><IconChartPie size={16} /></span>
                 <span className="format-pill-text">
                   <span className="format-title">CSV Spreadsheet</span>
                   <span className="format-desc">Excel &amp; Sheets ready</span>
@@ -214,7 +216,7 @@ export function ExportModal() {
                 className={`export-format-pill ${format === "txt" ? "active" : ""}`}
                 onClick={() => setFormat("txt")}
               >
-                <span className="format-pill-icon">📝</span>
+                <span className="format-pill-icon"><IconExport size={16} /></span>
                 <span className="format-pill-text">
                   <span className="format-title">Formatted Text</span>
                   <span className="format-desc">Human-readable report</span>
@@ -233,9 +235,9 @@ export function ExportModal() {
             </div>
             <div className="summary-security-note">
               {preset === "public_only" ? (
-                <span className="security-pill is-safe">✓ Safe — zero private keys exported</span>
+                <span className="security-pill is-safe"><IconCheckCircle size={12} /> Safe — zero private keys exported</span>
               ) : (
-                <span className="security-pill is-secret">⚠ Contains sensitive decrypted keys</span>
+                <span className="security-pill is-secret"><IconAlertTriangle size={12} /> Contains sensitive decrypted keys</span>
               )}
             </div>
           </div>
@@ -260,6 +262,7 @@ export function ExportModal() {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

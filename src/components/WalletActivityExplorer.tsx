@@ -1,5 +1,5 @@
 import { useApp } from "../context/AppContext";
-import { ChainIcon } from "../icons";
+import { ChainIcon, IconSearch, IconExternalLink } from "../icons";
 import type { WalletView } from "../lib/types";
 import { isSolanaWallet, walletDisplayAddress } from "../lib/wallet";
 
@@ -42,9 +42,9 @@ export function WalletActivityExplorer({ wallet }: { wallet: WalletView }) {
         {explorers.map((exp) => (
           <div key={exp.name} className="explorer-card" onClick={() => handleOpenUrl(exp.url)}>
             <div className="explorer-card-top">
-              {exp.icon ? <ChainIcon chain={exp.icon} size={18} /> : <span className="explorer-logo">🔍</span>}
+              {exp.icon ? <ChainIcon chain={exp.icon} size={18} /> : <span className="explorer-logo"><IconSearch size={16} /></span>}
               <span className="explorer-name">{exp.name}</span>
-              <span className="explorer-external-arrow">↗</span>
+              <span className="explorer-external-arrow"><IconExternalLink size={13} /></span>
             </div>
             <div className="explorer-desc">{exp.desc}</div>
             <div className="explorer-url mono">{exp.url.replace("https://", "").slice(0, 36)}…</div>

@@ -8,7 +8,7 @@ import {
   walletHasScanTarget,
   shortAddr,
 } from "../lib/wallet";
-import { IconScan, ChainIcon } from "../icons";
+import { IconScan, ChainIcon, IconChartPie, IconZap, IconRefresh, IconHistory, IconEye, IconLock, IconSprout, IconAlertTriangle, IconCheckCircle, IconCoin } from "../icons";
 import { SweeperWorkspace } from "./SweeperWorkspace";
 import { DexBatchTrader } from "./DexBatchTrader";
 import { WalletActivityExplorer } from "./WalletActivityExplorer";
@@ -223,28 +223,28 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
           className={`workspace-tab ${activeTab === "portfolio" ? "active" : ""}`}
           onClick={() => setActiveTab("portfolio")}
         >
-          📊 Portfolio & Balances
+          <IconChartPie size={13} /> Portfolio & Balances
         </button>
         <button
           type="button"
           className={`workspace-tab ${activeTab === "sweeper" ? "active" : ""}`}
           onClick={() => setActiveTab("sweeper")}
         >
-          ⚡ Fund Sweeper
+          <IconZap size={13} /> Fund Sweeper
         </button>
         <button
           type="button"
           className={`workspace-tab ${activeTab === "dex" ? "active" : ""}`}
           onClick={() => setActiveTab("dex")}
         >
-          🔄 DEX Batch Trader
+          <IconRefresh size={13} /> DEX Batch Trader
         </button>
         <button
           type="button"
           className={`workspace-tab ${activeTab === "explorer" ? "active" : ""}`}
           onClick={() => setActiveTab("explorer")}
         >
-          📜 Explorer Hub
+          <IconHistory size={13} /> Explorer Hub
         </button>
       </div>
 
@@ -259,7 +259,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                   ? "DUAL EVM + SOLANA KEY"
                   : "SOLANA KEY"}
             </span>
-            {wallet.hasFunds && <span className="hero-funded-pill">💰 Funded Asset</span>}
+            {wallet.hasFunds && <span className="hero-funded-pill">Funded Asset</span>}
 
             {/* Folder / Label Tag Manager */}
             <div className="detail-tag-cluster">
@@ -288,7 +288,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                     onClick={() => { setTagInput(wallet.label || ""); setIsEditingTag(true); }}
                     title="Click to edit label"
                   >
-                    {wallet.label ? `🏷️ ${wallet.label}` : "+ Add Tag"}
+                    {wallet.label ? wallet.label : "+ Add Tag"}
                   </button>
                   {["Main", "Airdrop", "Whales", "Burner"].map((p) => (
                     <button
@@ -394,26 +394,28 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                 <div className="credential-row sol-owner-credential-row">
                 <span className="credential-sub-lbl mono">Account Owner:</span>
                 {loadingSolAccount ? (
-                  <span className="credential-val mono text-muted text-xs">⏳ Querying Solana on-chain validator…</span>
+                <span className="credential-val mono text-muted text-xs">Querying Solana on-chain validator…</span>
                 ) : solAccountError ? (
-                  <div className="sol-owner-row">
-                    <span className="credential-val mono text-danger text-xs">⚠️ Query failed: {solAccountError}</span>
-                    <button type="button" className="btn-credential-action" onClick={fetchSolAccount}>
-                      Retry
-                    </button>
-                  </div>
+                <div className="sol-owner-row">
+                <span className="credential-val mono text-danger text-xs"><IconAlertTriangle size={12} /> Query failed: {solAccountError}</span>
+                <button type="button" className="btn-credential-action" onClick={fetchSolAccount}>
+                Retry
+                </button>
+                </div>
                 ) : solAccount ? (
-                  <div className="sol-owner-row">
-                    <span
-                      className={`sol-owner-badge ${
-                        solAccount.is_system_program
-                          ? "badge-sys-safe"
-                          : "badge-non-sys-warn"
-                      }`}
-                    >
-                      {solAccount.is_system_program
-                        ? "✓ System Program (Standard EOA)"
-                        : `⚠️ ${solAccount.owner_label}`}
+                <div className="sol-owner-row">
+                <span
+                className={`sol-owner-badge ${
+                solAccount.is_system_program
+                ? "badge-sys-safe"
+                : "badge-non-sys-warn"
+                }`}
+                >
+                {solAccount.is_system_program ? (
+                <><IconCheckCircle size={11} /> System Program (Standard EOA)</>
+                ) : (
+                    <><IconAlertTriangle size={11} /> {solAccount.owner_label}</>
+                      )}
                     </span>
                     <span
                       className="sol-owner-id-code mono"
@@ -484,15 +486,15 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
                 <div className="sol-non-standard-alert">
                   {solAccount.account_type === "nonce_account" ? (
                     <>
-                      ⚠️ <b>Durable Nonce Account:</b> Akun ini adalah akun Durable Nonce (ukuran 80 byte). Saldo {solAccount.sol_balance} SOL di dalamnya adalah dana sewa (rent reserve). Transfer native standar akan ditolak validator. Penarikan saldo dapat dilakukan via instruksi <code>nonceWithdraw</code> dengan tanda tangan dari Nonce Authority ({solAccount.authority ? shortAddr(solAccount.authority) : "tertera di atas"}).
+                      <b>Durable Nonce Account:</b> Akun ini adalah akun Durable Nonce (ukuran 80 byte). Saldo {solAccount.sol_balance} SOL di dalamnya adalah dana sewa (rent reserve). Transfer native standar akan ditolak validator. Penarikan saldo dapat dilakukan via instruksi <code>nonceWithdraw</code> dengan tanda tangan dari Nonce Authority ({solAccount.authority ? shortAddr(solAccount.authority) : "tertera di atas"}).
                     </>
                   ) : solAccount.account_type === "token_account" ? (
                     <>
-                      ⚠️ <b>SPL Token Account (ATA):</b> Akun ini adalah Token Account / Wrapped SOL. Penarikan saldo sewa SOL memerlukan penutupan akun token via instruksi <code>closeAccount</code> dari Token Program.
+                      <b>SPL Token Account (ATA):</b> Akun ini adalah Token Account / Wrapped SOL. Penarikan saldo sewa SOL memerlukan penutupan akun token via instruksi <code>closeAccount</code> dari Token Program.
                     </>
                   ) : (
                     <>
-                      ⚠️ <b>Custom Program Account:</b> Akun ini dikelola oleh program <code>{solAccount.owner}</code>. Transfer native standar tidak dapat mendebit dana secara langsung.
+                      <b>Custom Program Account:</b> Akun ini dikelola oleh program <code>{solAccount.owner}</code>. Transfer native standar tidak dapat mendebit dana secara langsung.
                     </>
                   )}
                 </div>
@@ -506,14 +508,14 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
         {wallet.type === "seed" && (
           <div className="mnemonic-seed-banner">
             <div className="mnemonic-meta">
-              <span className="mnemonic-title mono">🌱 BIP-39 MASTER SEED PHRASE</span>
+              <span className="mnemonic-title mono"><IconSprout size={12} /> BIP-39 MASTER SEED PHRASE</span>
               <span className="mnemonic-content mono">
                 {revealed && secret ? secret : "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"}
               </span>
             </div>
             <div className="mnemonic-actions">
               <button type="button" className="btn-credential-reveal" onClick={toggleReveal}>
-                {revealed ? "🔒 Hide Vault Secrets" : "👁️ Reveal All Secrets"}
+                {revealed ? <><IconLock size={12} /> Hide Vault Secrets</> : <><IconEye size={12} /> Reveal All Secrets</>}
               </button>
               {revealed && secret && (
                 <button type="button" className="btn-credential-copy-seed" onClick={copySeed}>
@@ -528,7 +530,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
         {wallet.type !== "seed" && (
           <div className="pk-reveal-bar">
             <button type="button" className="btn-credential-reveal" onClick={toggleReveal}>
-              {revealed ? "🔒 Hide Vault Keys" : "👁️ Reveal Private Keys"}
+              {revealed ? <><IconLock size={12} /> Hide Vault Keys</> : <><IconEye size={12} /> Reveal Private Keys</>}
             </button>
           </div>
         )}
@@ -605,7 +607,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
               </div>
             ) : (
               <div className="token-empty-notice">
-                <span className="notice-icon">🪙</span>
+                <span className="notice-icon"><IconCoin size={16} /></span>
                 <span>No secondary ERC-20 or SPL tokens detected on this wallet. Native balances are monitored above.</span>
               </div>
             )}

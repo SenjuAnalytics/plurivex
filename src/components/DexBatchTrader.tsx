@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
-import { ChainIcon } from "../icons";
+import { ChainIcon, IconTrendingUp, IconTrendingDown, IconTarget, IconZap } from "../icons";
 import type { WalletView } from "../lib/types";
 
 export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
@@ -42,14 +42,14 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
             className={`mode-pill ${tradeAction === "buy" ? "active-buy" : ""}`}
             onClick={() => setTradeAction("buy")}
           >
-            🟢 Batch Buy
+            <IconTrendingUp size={13} /> Batch Buy
           </button>
           <button
             type="button"
             className={`mode-pill ${tradeAction === "sell" ? "active-sell" : ""}`}
             onClick={() => setTradeAction("sell")}
           >
-            🔴 Batch Sell
+            <IconTrendingDown size={13} /> Batch Sell
           </button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
             />
             {tokenAddress && (
               <button type="button" className="btn-clear-input" onClick={() => setTokenAddress("")}>
-                ✕
+                ×
               </button>
             )}
           </div>
@@ -135,14 +135,14 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
                 className={`strat-btn ${traderMode === "distributed" ? "active" : ""}`}
                 onClick={() => setTraderMode("distributed")}
               >
-                🎯 Distributed Sniper
+                <IconTarget size={12} /> Distributed Sniper
               </button>
               <button
                 type="button"
                 className={`strat-btn ${traderMode === "sweep" ? "active" : ""}`}
                 onClick={() => setTraderMode("sweep")}
               >
-                ⚡ Auto-Consolidate
+                <IconZap size={12} /> Auto-Consolidate
               </button>
             </div>
           </div>
@@ -166,7 +166,7 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
           onClick={handleExecuteBatchTrade}
           disabled={isExecuting}
         >
-          {isExecuting ? "Broadcasting Transactions…" : `⚡ Execute Batch ${tradeAction === "buy" ? "Buy" : "Sell"} (${activeWalletsCount} Wallets)`}
+          {isExecuting ? "Broadcasting Transactions…" : <><IconZap size={13} /> Execute Batch {tradeAction === "buy" ? "Buy" : "Sell"} ({activeWalletsCount} Wallets)</>}
         </button>
       </div>
     </div>

@@ -11,7 +11,7 @@ import {
   balanceAmount,
 } from "../lib/chains";
 import type { WalletView } from "../lib/types";
-import { IconSearch, IconSeed, IconKey } from "../icons";
+import { IconSearch, IconSeed, IconKey, IconWallet } from "../icons";
 import { ChainIcon } from "../icons/ChainIcon";
 
 type Filter = "all" | "evm" | "sol" | "funded";
@@ -523,21 +523,21 @@ export function Sidebar() {
               className={`chain-pill chain-pill-bsc ${chainFilter === "bsc" ? "active" : ""}`}
               onClick={() => setChainFilter(chainFilter === "bsc" ? "all" : "bsc")}
             >
-              🟡 BNB ({bscFundedCount})
+              <ChainIcon chain="bsc" size={11} /> BNB ({bscFundedCount})
             </button>
             <button
               type="button"
               className={`chain-pill chain-pill-sol ${chainFilter === "sol" ? "active" : ""}`}
               onClick={() => setChainFilter(chainFilter === "sol" ? "all" : "sol")}
             >
-              🟣 SOL ({solFundedCount})
+              <ChainIcon chain="sol" size={11} /> SOL ({solFundedCount})
             </button>
             <button
               type="button"
               className={`chain-pill chain-pill-eth ${chainFilter === "eth" ? "active" : ""}`}
               onClick={() => setChainFilter(chainFilter === "eth" ? "all" : "eth")}
             >
-              💠 ETH ({ethFundedCount})
+              <ChainIcon chain="eth" size={11} /> ETH ({ethFundedCount})
             </button>
             {baseFundedCount > 0 && (
               <button
@@ -545,7 +545,7 @@ export function Sidebar() {
                 className={`chain-pill chain-pill-base ${chainFilter === "base" ? "active" : ""}`}
                 onClick={() => setChainFilter(chainFilter === "base" ? "all" : "base")}
               >
-                🔵 Base ({baseFundedCount})
+                <ChainIcon chain="base" size={11} /> Base ({baseFundedCount})
               </button>
             )}
             {arbFundedCount > 0 && (
@@ -554,7 +554,7 @@ export function Sidebar() {
                 className={`chain-pill chain-pill-arb ${chainFilter === "arb" ? "active" : ""}`}
                 onClick={() => setChainFilter(chainFilter === "arb" ? "all" : "arb")}
               >
-                🔷 Arb ({arbFundedCount})
+                <ChainIcon chain="arb" size={11} /> Arb ({arbFundedCount})
               </button>
             )}
           </div>
@@ -574,28 +574,28 @@ export function Sidebar() {
             className={`tag-pill tag-pill-main ${tagFilter?.toLowerCase() === "main" ? "active" : ""}`}
             onClick={() => setTagFilter(tagFilter?.toLowerCase() === "main" ? null : "main")}
           >
-            ⭐ Main
+            Main
           </button>
           <button
             type="button"
             className={`tag-pill tag-pill-airdrop ${tagFilter?.toLowerCase() === "airdrop" ? "active" : ""}`}
             onClick={() => setTagFilter(tagFilter?.toLowerCase() === "airdrop" ? null : "airdrop")}
           >
-            🪂 Airdrop
+            Airdrop
           </button>
           <button
             type="button"
             className={`tag-pill tag-pill-whales ${tagFilter?.toLowerCase() === "whales" ? "active" : ""}`}
             onClick={() => setTagFilter(tagFilter?.toLowerCase() === "whales" ? null : "whales")}
           >
-            🐋 Whales
+            Whales
           </button>
           <button
             type="button"
             className={`tag-pill tag-pill-burner ${tagFilter?.toLowerCase() === "burner" ? "active" : ""}`}
             onClick={() => setTagFilter(tagFilter?.toLowerCase() === "burner" ? null : "burner")}
           >
-            🔥 Burner
+            Burner
           </button>
           {existingTags
             .filter((t) => !["main", "airdrop", "whales", "burner"].includes(t.toLowerCase()))
@@ -606,7 +606,7 @@ export function Sidebar() {
                 className={`tag-pill ${tagFilter?.toLowerCase() === t.toLowerCase() ? "active" : ""}`}
                 onClick={() => setTagFilter(tagFilter?.toLowerCase() === t.toLowerCase() ? null : t)}
               >
-                🏷️ {t}
+                {t}
               </button>
             ))}
         </div>
@@ -622,7 +622,7 @@ export function Sidebar() {
                 onClick={() => selectAllFunded(filter === "evm" ? "evm" : filter === "sol" ? "sol" : "all")}
                 title={isAllFundedSelected ? "Deselect all funded wallets" : "Select all funded wallets"}
               >
-                {isAllFundedSelected ? "✕ Deselect Funded" : `☑️ Select All Funded (${activeScopeFundedCount})`}
+                {isAllFundedSelected ? "Deselect Funded" : `Select All Funded (${activeScopeFundedCount})`}
               </button>
             )}
 
@@ -633,7 +633,7 @@ export function Sidebar() {
                 onClick={clearSweepSelection}
                 title="Clear all checked checkboxes"
               >
-                ✕ Clear ({selectedSweepIds.size})
+                Clear ({selectedSweepIds.size})
               </button>
             )}
           </div>
@@ -648,7 +648,7 @@ export function Sidebar() {
         {!items.length ? (
           <div className="sidebar-empty">
             <div className="sidebar-empty-icon">
-              {filter === "funded" ? "💰" : "🔍"}
+              {filter === "funded" ? <IconWallet size={22} /> : <IconSearch size={22} />}
             </div>
             {filter === "funded" ? (
               <>No funded wallets detected yet.<br />Run <b>Scan All</b> to check live balances.</>

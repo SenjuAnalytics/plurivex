@@ -12,7 +12,7 @@ import { formatCompactBalance } from "../lib/chains";
 import { shortAddr } from "../lib/wallet";
 import { ethers } from "ethers";
 import { PublicKey } from "@solana/web3.js";
-import { ChainIcon } from "../icons";
+import { ChainIcon, IconArrowLeft, IconZap, IconRocket, IconEdit3, IconCheckCircle, IconAlertTriangle } from "../icons";
 
 function isValidSolAddress(addr: string): boolean {
   try {
@@ -201,7 +201,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
         </div>
         {onBack && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
-            ← Back to Portfolio
+            <IconArrowLeft size={13} /> Back to Portfolio
           </button>
         )}
       </div>
@@ -235,7 +235,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
               <span className="deck-col-label">2. MASTER DESTINATION RECIPIENT ADDRESS</span>
               {recipient ? (
                 <span className={`deck-val-badge ${validRecipient ? "valid" : "invalid"}`}>
-                  {validRecipient ? (isEvmChain ? "✓ Valid EVM Address" : "✓ Valid Solana Address") : (isEvmChain ? "✕ Invalid 0x Address" : "✕ Invalid Solana Address")}
+                  {validRecipient ? (isEvmChain ? "Valid EVM Address" : "Valid Solana Address") : (isEvmChain ? "Invalid 0x Address" : "Invalid Solana Address")}
                 </span>
               ) : (
                 <span className="deck-hint">Consolidation vault destination</span>
@@ -257,7 +257,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                   onClick={() => setRecipient("")}
                   title="Clear input"
                 >
-                  ✕
+                  ×
                 </button>
               )}
             </div>
@@ -295,7 +295,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                   disabled={sweeping}
                   title={`Fast priority gas (${(liveFeeGwei * 1.25).toFixed(2)} Gwei)`}
                 >
-                  Fast ⚡
+                  Fast <IconZap size={11} />
                 </button>
                 <button
                   type="button"
@@ -307,7 +307,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                   disabled={sweeping}
                   title={`Turbo priority gas (${(liveFeeGwei * 2.0).toFixed(2)} Gwei)`}
                 >
-                  Turbo 🚀
+                  Turbo <IconRocket size={11} />
                 </button>
                 {gasMode === "custom" ? (
                   <div className="gas-custom-inline">
@@ -343,7 +343,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                     disabled={sweeping}
                     title="Enter custom Gwei manually"
                   >
-                    Custom ✏️
+                    Custom <IconEdit3 size={11} />
                   </button>
                 )}
               </div>
@@ -352,7 +352,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
             <div className="sweeper-deck-col col-gas">
               <div className="deck-col-header">
                 <span className="deck-col-label">3. SOLANA NETWORK TRANSACTION FEE</span>
-                <span className="deck-gas-live mono text-emerald">● Fixed Protocol Fee</span>
+                <span className="deck-gas-live mono text-emerald">Fixed Protocol Fee</span>
               </div>
               <div className="gas-segmented-bar sol-fee-container">
                 <span className="sol-fee-text mono">0.000005 SOL (5,000 Lamports · Fixed Fast)</span>
@@ -377,7 +377,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
 
         {targetWallets.length === 0 ? (
           <div className="sweeper-empty-notice">
-            <span className="notice-icon">👈</span>
+            <span className="notice-icon"><IconArrowLeft size={16} /></span>
             <div className="empty-notice-text">
               <strong>No Wallets Selected for Sweeper</strong>
               <p>
@@ -425,12 +425,12 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                       <td>
                         {res ? (
                           res.success ? (
-                            <span className="status-badge success" title={res.txHash}>✓ Swept</span>
+                            <span className="status-badge success" title={res.txHash}><IconCheckCircle size={10} /> Swept</span>
                           ) : (
-                            <span className="status-badge error" title={res.error}>✕ Failed</span>
+                            <span className="status-badge error" title={res.error}><IconAlertTriangle size={10} /> Failed</span>
                           )
                         ) : est?.isSweepable ? (
-                          <span className="status-badge ready">● Ready</span>
+                          <span className="status-badge ready">Ready</span>
                         ) : (
                           <span className="status-badge dust">Insufficient Gas</span>
                         )}
@@ -465,7 +465,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
         >
           {sweeping
             ? `Sweeping (${sweepProgress?.current || 0}/${sweepProgress?.total || 0})…`
-            : `⚡ Execute Multi-Wallet Sweep (${sweepableWallets.length} Wallets)`}
+            : <><IconZap size={14} /> Execute Multi-Wallet Sweep ({sweepableWallets.length} Wallets)</>}
         </button>
       </div>
     </div>

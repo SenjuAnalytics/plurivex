@@ -7,7 +7,7 @@ import { SweeperWorkspace } from "./SweeperWorkspace";
 import { ExportModal } from "./ExportModal";
 import { ResetAllWalletsModal } from "./ResetAllWalletsModal";
 import { WindowControls } from "./WindowControls";
-import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport } from "../icons";
+import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport, IconExport, IconTrash, IconFolder, IconSearch } from "../icons";
 
 export function MainApp() {
   const [mainView, setMainView] = useState<"detail" | "sweeper">("detail");
@@ -96,7 +96,8 @@ export function MainApp() {
               disabled={!wallets.length}
               title="Export Vault with Presets (Funded, Public, Full Backup)"
             >
-              <span>📤 Export Vault</span>
+              <IconExport size={13} />
+              <span>Export</span>
             </button>
 
             <button
@@ -106,7 +107,7 @@ export function MainApp() {
               disabled={!wallets.length}
               title="Reset All Wallets (Requires Master Password)"
             >
-              <span>🗑️ Reset All</span>
+              <IconTrash size={13} />
             </button>
           </div>
 
@@ -220,7 +221,7 @@ export function MainApp() {
                       onClick={() => setIsExportModalOpen(true)}
                       disabled={!wallets.length}
                     >
-                      <div className="tile-icon-wrap">📁</div>
+                      <div className="tile-icon-wrap"><IconFolder size={18} /></div>
                       <div className="tile-content">
                         <div className="tile-title">Export Vault Data</div>
                         <div className="tile-desc">Safely backup and export decrypted wallet addresses, keys, and balances to standard TXT or CSV formats.</div>
@@ -234,7 +235,7 @@ export function MainApp() {
                       onClick={scanAll}
                       disabled={!wallets.length || scanning}
                     >
-                      <div className="tile-icon-wrap">🔍</div>
+                      <div className="tile-icon-wrap"><IconSearch size={18} /></div>
                       <div className="tile-content">
                         <div className="tile-title">Full Multi-Chain Scan</div>
                         <div className="tile-desc">Query realtime balances across Ethereum, BSC, Base, Arbitrum, & Solana via high-speed RPCs.</div>
