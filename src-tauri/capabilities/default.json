@@ -13,6 +13,12 @@
     "fs:allow-write-text-file",
     "allow-rpc-get-balance",
     "allow-scan-balances",
-    "allow-sweep-commands"
+    "allow-fee-estimate",
+    "allow-tx-broadcast",
+    "allow-directory-scan",
+    "allow-clipboard-clear",
+    "allow-window-controls",
+    "allow-vault-crypto",
+    "allow-vault-derivation"
   ]
 }
