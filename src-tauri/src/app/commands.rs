@@ -107,6 +107,60 @@ pub fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn window_close(window: tauri::Window) -> Result<(), String> {
+pub async fn window_close(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn schedule_clipboard_clear(timeout_secs: u64) -> Result<(), String> {
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(timeout_secs)).await;
+        #[cfg(target_os = "windows")]
+        {
+            use std::ffi::c_void;
+            #[link(name = "user32")]
+            extern "system" {
+                fn OpenClipboard(hWndNewOwner: *mut c_void) -> i32;
+                fn EmptyClipboard() -> i32;
+                fn CloseClipboard() -> i32;
+            }
+            // Retry up to 10 times with 100ms interval in case clipboard is momentarily locked
+            for _ in 0..10 {
+                unsafe {
+                    if OpenClipboard(std::ptr::null_mut()) != 0 {
+                        EmptyClipboard();
+                        CloseClipboard();
+                        break;
+                    }
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+    });
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_windows_empty_clipboard() {
+        use std::ffi::c_void;
+        #[link(name = "user32")]
+        extern "system" {
+            fn OpenClipboard(hWndNewOwner: *mut c_void) -> i32;
+            fn EmptyClipboard() -> i32;
+            fn CloseClipboard() -> i32;
+        }
+        unsafe {
+            let opened = OpenClipboard(std::ptr::null_mut());
+            println!("OpenClipboard returned: {}", opened);
+            assert_ne!(opened, 0, "OpenClipboard failed");
+            let emptied = EmptyClipboard();
+            println!("EmptyClipboard returned: {}", emptied);
+            assert_ne!(emptied, 0, "EmptyClipboard failed");
+            CloseClipboard();
+        }
+    }
 }

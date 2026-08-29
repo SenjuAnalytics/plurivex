@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useApp } from "../context/AppContext";
+import { copySensitiveToClipboard } from "../lib/security";
 import { balanceAmount, chainsForWallet, formatCompactBalance, type Chain } from "../lib/chains";
 import type { WalletView } from "../lib/types";
 import {
@@ -80,8 +81,23 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     setTagInput(wallet.label || "");
   }, [wallet.id, wallet.label]);
 
+  const autoMaskTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (autoMaskTimerRef.current) {
+        clearTimeout(autoMaskTimerRef.current);
+        autoMaskTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const toggleReveal = async () => {
     if (revealed) {
+      if (autoMaskTimerRef.current) {
+        clearTimeout(autoMaskTimerRef.current);
+        autoMaskTimerRef.current = null;
+      }
       setRevealed(false);
       setSecret(null);
       return;
@@ -89,6 +105,17 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     const s = await revealSecret(wallet.id);
     setSecret(s);
     setRevealed(true);
+    toast("Credentials revealed. Auto-masking in 15s for visual privacy", "info");
+
+    if (autoMaskTimerRef.current) {
+      clearTimeout(autoMaskTimerRef.current);
+    }
+    autoMaskTimerRef.current = setTimeout(() => {
+      setRevealed(false);
+      setSecret(null);
+      toast("Credentials auto-masked for visual privacy", "info");
+      autoMaskTimerRef.current = null;
+    }, 15000);
   };
 
   const dualCreds = useMemo(() => {
@@ -143,22 +170,22 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     toast("Solana Address copied to clipboard", "success");
   };
 
-  const copyEvmPk = () => {
+  const copyEvmPk = async () => {
     if (!evmPk) return;
-    navigator.clipboard.writeText(evmPk);
-    toast("EVM Private Key copied to clipboard", "success");
+    await copySensitiveToClipboard(evmPk, 30000);
+    toast("EVM Private Key copied! Auto-clears in 30s for security", "success");
   };
 
-  const copySolPk = () => {
+  const copySolPk = async () => {
     if (!solPk) return;
-    navigator.clipboard.writeText(solPk);
-    toast("Solana Private Key copied to clipboard", "success");
+    await copySensitiveToClipboard(solPk, 30000);
+    toast("Solana Private Key copied! Auto-clears in 30s for security", "success");
   };
 
-  const copySeed = () => {
+  const copySeed = async () => {
     if (!secret) return;
-    navigator.clipboard.writeText(secret);
-    toast("Master Seed Phrase copied to clipboard", "success");
+    await copySensitiveToClipboard(secret, 30000);
+    toast("Master Seed Phrase copied! Auto-clears in 30s for security", "success");
   };
 
   const saveTag = () => {

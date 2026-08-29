@@ -94,6 +94,8 @@ interface AppContextValue {
   exportWallets: (format: "txt" | "csv") => Promise<void>;
   exportWalletsWithOptions: (options: ExportOptions) => Promise<void>;
   revealSecret: (id: number) => Promise<string | null>;
+  autoLockMinutes: number;
+  setAutoLockMinutes: (mins: number) => void;
   toast: (text: string, type?: ToastType) => void;
   toasts: ToastMessage[];
   filteredWallets: WalletView[];
@@ -426,12 +428,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const lock = () => {
+  const [autoLockMinutes, setAutoLockMinutesState] = useState<number>(() => {
+    const saved = localStorage.getItem("plurivex_autolock_minutes");
+    return saved !== null ? Number(saved) : 0; // Default: Off (User opt-in)
+  });
+
+  const setAutoLockMinutes = useCallback((mins: number) => {
+    setAutoLockMinutesState(mins);
+    localStorage.setItem("plurivex_autolock_minutes", String(mins));
+    if (mins === 0) {
+      toast("Auto-lock disabled (Never)", "info");
+    } else if (mins < 1) {
+      toast(`Auto-lock set to ${Math.round(mins * 60)}s (Quick Test)`, "info");
+    } else {
+      toast(`Auto-lock set to ${mins} minute${mins > 1 ? "s" : ""}`, "info");
+    }
+  }, [toast]);
+
+  const lock = useCallback(() => {
     setMasterPw("");
     setWallets([]);
     setSelectedId(null);
     setScreen("unlock");
-  };
+  }, []);
+
+  // Fitur #49: Auto-Lock Security Timer (User-configurable, default 5m)
+  useEffect(() => {
+    if (screen !== "app" || autoLockMinutes <= 0) return;
+
+    let timer: any = null;
+    const IDLE_TIMEOUT_MS = autoLockMinutes * 60 * 1000;
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        lock();
+        toast(`Vault automatically locked due to inactivity (${autoLockMinutes < 1 ? Math.round(autoLockMinutes * 60) + "s" : autoLockMinutes + "m"} idle)`, "info");
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "wheel"];
+    for (const evt of events) {
+      window.addEventListener(evt, resetTimer, { passive: true });
+    }
+
+    resetTimer();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      for (const evt of events) {
+        window.removeEventListener(evt, resetTimer);
+      }
+    };
+  }, [screen, autoLockMinutes, lock, toast]);
 
   const importWallets = async (input: string | string[]) => {
     const lines = Array.isArray(input) ? input : smartNormalizeInput(input);
@@ -797,6 +846,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     exportWallets,
     exportWalletsWithOptions,
     revealSecret,
+    autoLockMinutes,
+    setAutoLockMinutes,
     toast,
     toasts,
     filteredWallets,

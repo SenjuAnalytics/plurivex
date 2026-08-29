@@ -22,7 +22,8 @@ pub fn run() {
             app::commands::scan_directory_native,
             app::commands::window_minimize,
             app::commands::window_toggle_maximize,
-            app::commands::window_close
+            app::commands::window_close,
+            app::commands::schedule_clipboard_clear
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

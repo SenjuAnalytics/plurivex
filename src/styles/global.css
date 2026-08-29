@@ -289,6 +289,33 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .btn-lock-minimal { padding: 0 8px; color: var(--text-secondary); }
 .btn-lock-minimal:hover { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
 
+.select-autolock-header {
+  height: 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--r-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--t-fast);
+  -webkit-app-region: no-drag;
+}
+.select-autolock-header:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.select-autolock-header:focus {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.select-autolock-header option {
+  background: #131722;
+  color: #e2e8f0;
+}
+
 .header-divider-v { width: 1px; height: 18px; background: var(--border-strong); margin: 0 2px; }
 
 .window-controls-group { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; -webkit-app-region: no-drag; }

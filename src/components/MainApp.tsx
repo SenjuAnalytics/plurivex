@@ -23,6 +23,8 @@ export function MainApp() {
     fundedCount,
     setIsExportModalOpen,
     setIsResetModalOpen,
+    autoLockMinutes,
+    setAutoLockMinutes,
   } = useApp();
 
   const selected = wallets.find((w) => w.id === selectedId) ?? null;
@@ -114,11 +116,26 @@ export function MainApp() {
           <div className="header-divider-v" />
 
           <div className="header-action-group">
+            <select
+              className="select-autolock-header"
+              value={autoLockMinutes}
+              onChange={(e) => setAutoLockMinutes(Number(e.target.value))}
+              title="Auto-Lock Timer: Set idle time before vault locks"
+            >
+              <option value={0}>⏱️ Lock: Off</option>
+              <option value={0.5}>⏱️ Lock: 30s (Test)</option>
+              <option value={1}>⏱️ Lock: 1m</option>
+              <option value={5}>⏱️ Lock: 5m</option>
+              <option value={15}>⏱️ Lock: 15m</option>
+              <option value={30}>⏱️ Lock: 30m</option>
+              <option value={60}>⏱️ Lock: 1h</option>
+            </select>
+
             <button
               type="button"
               className="btn-action-minimal btn-lock-minimal"
               onClick={lock}
-              title="Lock Application Vault"
+              title="Lock Application Vault Immediately"
             >
               <IconLock size={13} />
             </button>

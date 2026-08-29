@@ -21,5 +21,6 @@ commands.allow = [
   "scan_directory_native",
   "window_minimize",
   "window_toggle_maximize",
-  "window_close"
+  "window_close",
+  "schedule_clipboard_clear"
 ]
