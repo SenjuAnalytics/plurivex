@@ -22,5 +22,11 @@ commands.allow = [
   "window_minimize",
   "window_toggle_maximize",
   "window_close",
-  "schedule_clipboard_clear"
+  "schedule_clipboard_clear",
+  "vault_encrypt",
+  "vault_decrypt",
+  "vault_create_token",
+  "vault_verify_token",
+  "vault_derive_credentials",
+  "vault_validate_mnemonic"
 ]

@@ -23,7 +23,13 @@ pub fn run() {
             app::commands::window_minimize,
             app::commands::window_toggle_maximize,
             app::commands::window_close,
-            app::commands::schedule_clipboard_clear
+            app::commands::schedule_clipboard_clear,
+            app::commands::vault_encrypt,
+            app::commands::vault_decrypt,
+            app::commands::vault_create_token,
+            app::commands::vault_verify_token,
+            app::commands::vault_derive_credentials,
+            app::commands::vault_validate_mnemonic
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
 import { wordlists } from "@ethersproject/wordlists";
 import {
@@ -215,6 +216,21 @@ export interface DualCredentials {
   solAddress: string | null;
   evmPrivateKey: string | null;
   solPrivateKey: string | null;
+}
+
+export async function deriveDualCredentialsNative(
+  secret: string,
+  type: WalletType
+): Promise<DualCredentials> {
+  try {
+    return await invoke<DualCredentials>("vault_derive_credentials", {
+      secret,
+      walletType: type,
+    });
+  } catch (err) {
+    console.warn("Native derivation failed, falling back:", err);
+    return deriveDualCredentials(secret, type);
+  }
 }
 
 export function deriveDualCredentials(secret: string, type: WalletType): DualCredentials {

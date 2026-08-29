@@ -140,10 +140,41 @@ pub async fn schedule_clipboard_clear(timeout_secs: u64) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub async fn vault_encrypt(plaintext: String, password: String) -> Result<String, String> {
+    crate::core::security::crypto::encrypt_vault(&plaintext, &password)
+}
+
+#[tauri::command]
+pub async fn vault_decrypt(blob: String, password: String) -> Result<String, String> {
+    crate::core::security::crypto::decrypt_vault(&blob, &password)
+}
+
+#[tauri::command]
+pub async fn vault_create_token(password: String) -> Result<String, String> {
+    crate::core::security::crypto::create_verification_token(&password)
+}
+
+#[tauri::command]
+pub async fn vault_verify_token(token: String, password: String) -> Result<bool, String> {
+    Ok(crate::core::security::crypto::verify_password(&token, &password))
+}
+
+#[tauri::command]
+pub async fn vault_derive_credentials(
+    secret: String,
+    wallet_type: String,
+) -> Result<crate::core::wallets::derivation::DualCredentials, String> {
+    crate::core::wallets::derivation::derive_dual_credentials_native(&secret, &wallet_type)
+}
+
+#[tauri::command]
+pub async fn vault_validate_mnemonic(phrase: String) -> Result<bool, String> {
+    Ok(crate::core::wallets::derivation::is_valid_mnemonic_phrase(&phrase))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_windows_empty_clipboard() {
         use std::ffi::c_void;
