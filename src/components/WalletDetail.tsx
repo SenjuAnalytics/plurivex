@@ -313,7 +313,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
               disabled={!walletHasScanTarget(wallet) || scanning}
             >
               <IconScan size={13} />
-              <span>{scanning ? "Scanning…" : "Rescan All"}</span>
+              <span>{scanning ? "Scanning…" : "Rescan Wallet"}</span>
             </button>
             <button
               type="button"

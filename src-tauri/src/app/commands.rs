@@ -1,0 +1,112 @@
+use crate::adapters::evm::client::*;
+use crate::adapters::solana::client::*;
+use crate::core::scanner::{execute_scan_balances, ScanSummary, CHAINS, ChainKind};
+use crate::core::wallets::import::{scan_directory_native as core_scan_dir, NativeScanResult};
+
+#[tauri::command]
+pub async fn rpc_get_balance(address: String, rpc: String) -> Result<String, String> {
+    crate::adapters::evm::client::rpc_get_balance(&address, &rpc).await
+}
+
+#[tauri::command]
+pub async fn rpc_get_sol_balance(address: String, rpc: String) -> Result<String, String> {
+    crate::adapters::solana::client::rpc_get_sol_balance(&address, &rpc).await
+}
+
+#[tauri::command]
+pub async fn scan_balances(
+    app: tauri::AppHandle,
+    wallet_id: Option<i64>,
+    wallet_ids: Option<Vec<i64>>,
+) -> Result<ScanSummary, String> {
+    execute_scan_balances(app, wallet_id, wallet_ids).await
+}
+
+#[tauri::command]
+pub async fn get_chain_fee_data(chain_key: String) -> Result<ChainFeeResponse, String> {
+    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+
+    if chain.kind == ChainKind::Solana {
+        return Ok(ChainFeeResponse {
+            gas_price_gwei: 0.0,
+            priority_fee_gwei: 0.0,
+            estimated_fee_eth: "0.00000500 SOL".to_string(),
+            chain_id: 101,
+            symbol: "SOL".to_string(),
+        });
+    }
+
+    crate::adapters::evm::client::get_chain_fee_data(chain.key, chain.rpcs, chain.symbol).await
+}
+
+#[tauri::command]
+pub async fn get_account_nonce_and_balance(chain_key: String, address: String) -> Result<AccountInfoResponse, String> {
+    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+
+    if chain.kind == ChainKind::Solana {
+        for rpc in chain.rpcs {
+            if let Ok(lamports_str) = crate::adapters::solana::client::rpc_get_sol_balance(&address, rpc).await {
+                let lamports: u64 = lamports_str.parse().unwrap_or(0);
+                let sol_amt = (lamports as f64) / 1e9;
+                let formatted = format!("{:.6} SOL", sol_amt);
+                return Ok(AccountInfoResponse {
+                    balance_hex: format!("{:#x}", lamports),
+                    balance_eth: sol_amt,
+                    balance_formatted: formatted,
+                    nonce: 0,
+                });
+            }
+        }
+        return Err("Failed to query Solana balance from all RPC nodes".to_string());
+    }
+
+    crate::adapters::evm::client::get_account_nonce_and_balance(chain.key, chain.rpcs, chain.symbol, &address).await
+}
+
+#[tauri::command]
+pub async fn broadcast_raw_tx(chain_key: String, raw_tx: String) -> Result<String, String> {
+    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+    crate::adapters::evm::client::broadcast_raw_tx(chain.key, chain.rpcs, &raw_tx).await
+}
+
+#[tauri::command]
+pub async fn get_solana_recent_blockhash() -> Result<String, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    crate::adapters::solana::client::get_solana_recent_blockhash(chain.rpcs).await
+}
+
+#[tauri::command]
+pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    crate::adapters::solana::client::broadcast_solana_tx(chain.rpcs, &raw_tx_base64).await
+}
+
+#[tauri::command]
+pub async fn get_solana_account_details(address: String) -> Result<SolanaAccountDetails, String> {
+    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    crate::adapters::solana::client::get_solana_account_details(chain.rpcs, &address).await
+}
+
+#[tauri::command]
+pub async fn scan_directory_native(path: String) -> Result<NativeScanResult, String> {
+    core_scan_dir(path).await
+}
+
+#[tauri::command]
+pub fn window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize().map_err(|e| e.to_string())
+    } else {
+        window.maximize().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub fn window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
