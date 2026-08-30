@@ -214,8 +214,11 @@ export function deriveEvmWallet(secret: string, type: WalletType): ethers.Wallet
 export interface DualCredentials {
   evmAddress: string | null;
   solAddress: string | null;
+  btcAddress?: string | null;
+  btcLegacyAddress?: string | null;
   evmPrivateKey: string | null;
   solPrivateKey: string | null;
+  btcPrivateKey?: string | null;
 }
 
 export async function deriveDualCredentialsNative(
@@ -230,6 +233,21 @@ export async function deriveDualCredentialsNative(
   } catch (err) {
     console.warn("Native derivation failed, falling back:", err);
     return deriveDualCredentials(secret, type);
+  }
+}
+
+export async function deriveDualCredentialsBatchNative(
+  secrets: string[],
+  type: WalletType
+): Promise<(DualCredentials | null)[]> {
+  try {
+    return await invoke<(DualCredentials | null)[]>("vault_derive_credentials_batch", {
+      secrets,
+      walletType: type,
+    });
+  } catch (err) {
+    console.warn("Native batch derivation failed, falling back:", err);
+    return secrets.map((s) => deriveDualCredentials(s, type));
   }
 }
 

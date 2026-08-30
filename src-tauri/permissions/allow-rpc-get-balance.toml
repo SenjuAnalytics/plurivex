@@ -43,6 +43,7 @@ identifier = "allow-vault-crypto"
 description = "Allow native vault encryption and password verification"
 commands.allow = [
   "vault_encrypt",
+  "vault_encrypt_batch",
   "vault_decrypt",
   "vault_create_token",
   "vault_verify_token"
@@ -53,6 +54,8 @@ identifier = "allow-vault-derivation"
 description = "Allow native dual-chain key derivation and mnemonic validation"
 commands.allow = [
   "vault_derive_credentials",
-  "vault_validate_mnemonic"
+  "vault_derive_credentials_batch",
+  "vault_validate_mnemonic",
+  "vault_repair_mnemonic"
 ]
 

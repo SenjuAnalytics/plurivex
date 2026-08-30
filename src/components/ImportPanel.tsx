@@ -15,6 +15,7 @@ import { walletFingerprint } from "../lib/fingerprint";
 import { IconFolder, IconImport, IconKey, IconSeed, IconUpload } from "../icons";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { MnemonicRepairModal } from "./MnemonicRepairModal";
 
 interface ImportPanelProps {
   floating?: boolean;
@@ -33,6 +34,7 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
   const [scanReport, setScanReport] = useState<FileScanReport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const [isRepairOpen, setIsRepairOpen] = useState(false);
 
   const apply = async () => {
     if ((!raw.trim() && (!stagedWallets || !stagedWallets.length)) || loading || parsing) return;
@@ -418,6 +420,15 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
           <IconKey size={12} /> 64-hex
         </span>
         <span className="import-floating-tag accent">Files + folders</span>
+        <button
+          type="button"
+          className="import-floating-tag"
+          style={{ cursor: "pointer", background: "rgba(16, 185, 129, 0.12)", borderColor: "rgba(16, 185, 129, 0.35)", color: "#34d399", fontWeight: 600 }}
+          onClick={() => setIsRepairOpen(true)}
+          title="Open Mnemonic Typo Repair Tool (BIP-39 Levenshtein Heuristic Recovery)"
+        >
+          🪄 Typo Repair
+        </button>
       </div>
 
       {parsing && readProgress && (
@@ -579,6 +590,16 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
             : "Import →"}
         </button>
       </div>
+
+      <MnemonicRepairModal
+        isOpen={isRepairOpen}
+        initialPhrase={raw}
+        onClose={() => setIsRepairOpen(false)}
+        onApplyRepairedPhrase={(repaired) => {
+          setRaw(repaired);
+          toast("Repaired phrase applied to import input!", "success");
+        }}
+      />
     </div>
   );
 }

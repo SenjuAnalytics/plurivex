@@ -62,5 +62,11 @@ pub fn get_migrations() -> Vec<Migration> {
             );",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "add_btc_address_column",
+            sql: "ALTER TABLE wallets ADD COLUMN btc_address TEXT;",
+            kind: MigrationKind::Up,
+        },
     ]
 }

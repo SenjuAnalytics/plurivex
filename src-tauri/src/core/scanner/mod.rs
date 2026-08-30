@@ -1,5 +1,6 @@
 pub mod evm;
 pub mod solana;
+pub mod bitcoin;
 pub mod pricing;
 
 use futures::future::join_all;
@@ -42,6 +43,7 @@ pub struct ScanSummary {
 pub enum ChainKind {
     Evm,
     Solana,
+    Bitcoin,
 }
 
 pub struct ChainConfig {
@@ -53,6 +55,16 @@ pub struct ChainConfig {
 }
 
 pub const CHAINS: &[ChainConfig] = &[
+    ChainConfig {
+        key: "btc",
+        rpcs: &[
+            "https://mempool.space/api",
+            "https://blockstream.info/api",
+        ],
+        symbol: "BTC",
+        kind: ChainKind::Bitcoin,
+        tokens: &[],
+    },
     ChainConfig {
         key: "eth",
         rpcs: &[
@@ -145,11 +157,11 @@ pub async fn execute_scan_balances(
         [],
     );
 
-    let wallets: Vec<(i64, Option<String>, Option<String>)> = if let Some(id) = wallet_id {
+    let wallets: Vec<(i64, Option<String>, Option<String>, Option<String>)> = if let Some(id) = wallet_id {
         conn.query_row(
-            "SELECT id, address, sol_address FROM wallets WHERE id = ?1 AND (address IS NOT NULL OR sol_address IS NOT NULL)",
+            "SELECT id, address, sol_address, btc_address FROM wallets WHERE id = ?1 AND (address IS NOT NULL OR sol_address IS NOT NULL OR btc_address IS NOT NULL)",
             params![id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map(|row| vec![row])
         .map_err(|e| e.to_string())?
@@ -159,19 +171,19 @@ pub async fn execute_scan_balances(
         }
         let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
-            "SELECT id, address, sol_address FROM wallets WHERE id IN ({placeholders}) AND (address IS NOT NULL OR sol_address IS NOT NULL) ORDER BY id"
+            "SELECT id, address, sol_address, btc_address FROM wallets WHERE id IN ({placeholders}) AND (address IS NOT NULL OR sol_address IS NOT NULL OR btc_address IS NOT NULL) ORDER BY id"
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(rusqlite::params_from_iter(ids.iter()), |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .query_map(rusqlite::params_from_iter(ids.iter()), |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
             .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     } else {
         let mut stmt = conn
-            .prepare("SELECT id, address, sol_address FROM wallets WHERE address IS NOT NULL OR sol_address IS NOT NULL ORDER BY id")
+            .prepare("SELECT id, address, sol_address, btc_address FROM wallets WHERE address IS NOT NULL OR sol_address IS NOT NULL OR btc_address IS NOT NULL ORDER BY id")
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
             .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     };
@@ -186,12 +198,13 @@ pub async fn execute_scan_balances(
     let semaphore = Arc::new(Semaphore::new(16));
     let mut tasks = Vec::new();
 
-    for (w_id, evm_addr, sol_addr) in wallets {
+    for (w_id, evm_addr, sol_addr, btc_addr) in wallets {
         for chain in CHAINS {
             let permit = semaphore.clone();
             let c_client = client.clone();
             let c_evm = evm_addr.clone();
             let c_sol = sol_addr.clone();
+            let c_btc = btc_addr.clone();
 
             tasks.push(async move {
                 let _permit = permit.acquire().await.ok();
@@ -200,6 +213,12 @@ pub async fn execute_scan_balances(
                         solana::scan_solana_for_wallet(&c_client, addr, chain.rpcs, w_id).await
                     } else {
                         Err("No solana address".to_string())
+                    }
+                } else if chain.kind == ChainKind::Bitcoin {
+                    if let Some(ref addr) = c_btc {
+                        bitcoin::scan_bitcoin_for_wallet(&c_client, addr, chain.rpcs, w_id).await
+                    } else {
+                        Err("No bitcoin address".to_string())
                     }
                 } else if let Some(ref addr) = c_evm {
                     evm::scan_evm_for_wallet(&c_client, addr, chain.key, chain.symbol, chain.rpcs, chain.tokens, w_id).await

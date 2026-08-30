@@ -74,6 +74,18 @@ export const CHAINS = [
     symbol: "SOL",
     color: "#9945ff",
   },
+  {
+    key: "btc",
+    label: "Bitcoin",
+    short: "BTC",
+    family: "bitcoin" as const,
+    rpcs: [
+      "https://mempool.space/api",
+      "https://blockstream.info/api",
+    ],
+    symbol: "BTC",
+    color: "#f7931a",
+  },
 ] as const;
 
 export type ChainKey = (typeof CHAINS)[number]["key"];
@@ -81,17 +93,26 @@ export type Chain = (typeof CHAINS)[number];
 
 export const EVM_CHAINS = CHAINS.filter((c) => c.family === "evm");
 export const SOL_CHAINS = CHAINS.filter((c) => c.family === "solana");
+export const BTC_CHAINS = CHAINS.filter((c) => c.family === "bitcoin");
 
-export function chainsForWallet(walletOrType?: WalletType | { address?: string | null; solAddress?: string | null; type?: WalletType }): readonly Chain[] {
+export function chainsForWallet(
+  walletOrType?:
+    | WalletType
+    | { address?: string | null; solAddress?: string | null; btcAddress?: string | null; type?: WalletType }
+): readonly Chain[] {
   if (!walletOrType) return CHAINS;
   if (typeof walletOrType === "string") {
     return CHAINS;
   }
   const hasEvm = Boolean(walletOrType.address);
   const hasSol = Boolean(walletOrType.solAddress);
-  if (hasEvm && hasSol) return CHAINS;
-  if (hasSol && !hasEvm) return SOL_CHAINS;
-  return EVM_CHAINS;
+  const hasBtc = Boolean(walletOrType.btcAddress);
+  return CHAINS.filter((c) => {
+    if (c.family === "evm") return hasEvm;
+    if (c.family === "solana") return hasSol;
+    if (c.family === "bitcoin") return hasBtc;
+    return true;
+  });
 }
 
 const RPC_TIMEOUT_MS = 12_000;
@@ -168,7 +189,48 @@ function formatBalance(wei: bigint, symbol: string): string {
   return `${num.toFixed(5)} ${symbol}`;
 }
 
+export function formatBtcBalance(satoshis: bigint | number): string {
+  const btc = Number(satoshis) / 100_000_000;
+  if (!Number.isFinite(btc) || btc === 0) return "0 BTC";
+  if (btc < 0.000001) {
+    const trimmed = btc.toFixed(8).replace(/\.?0+$/, "");
+    return `${trimmed === "0" ? "< 0.000001" : trimmed} BTC`;
+  }
+  return `${btc.toFixed(8).replace(/\.?0+$/, "")} BTC`;
+}
+
+async function rpcGetBtcBalance(address: string, endpoint: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
+  try {
+    const url = `${endpoint.replace(/\/+$/, "")}/address/${address}`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      chain_stats?: { funded_txo_sum?: number; spent_txo_sum?: number };
+      mempool_stats?: { funded_txo_sum?: number; spent_txo_sum?: number };
+    };
+    const funded = (data.chain_stats?.funded_txo_sum ?? 0) + (data.mempool_stats?.funded_txo_sum ?? 0);
+    const spent = (data.chain_stats?.spent_txo_sum ?? 0) + (data.mempool_stats?.spent_txo_sum ?? 0);
+    const satoshis = Math.max(0, funded - spent);
+    return formatBtcBalance(satoshis);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchBalance(address: string, chain: Chain): Promise<string> {
+  if (chain.family === "bitcoin") {
+    for (const rpc of chain.rpcs) {
+      try {
+        return await rpcGetBtcBalance(address, rpc);
+      } catch {
+        /* try next rpc */
+      }
+    }
+    return "error";
+  }
+
   if (chain.family === "solana") {
     for (const rpc of chain.rpcs) {
       try {

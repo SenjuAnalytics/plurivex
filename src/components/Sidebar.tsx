@@ -14,7 +14,7 @@ import type { WalletView } from "../lib/types";
 import { IconSearch, IconSeed, IconKey, IconWallet } from "../icons";
 import { ChainIcon } from "../icons/ChainIcon";
 
-type Filter = "all" | "evm" | "sol" | "funded";
+type Filter = "all" | "funded" | "btc" | "evm" | "sol";
 
 function CustomCheckbox({
   checked,
@@ -91,6 +91,8 @@ const WalletRow = memo(function WalletRow({
 
   // Approximate USD weight to find the truly largest balance
   const approximateUsdRate: Record<string, number> = {
+    btc: 95000,
+    bitcoin: 95000,
     eth: 2600,
     bsc: 600,
     base: 2600,
@@ -112,9 +114,11 @@ const WalletRow = memo(function WalletRow({
         return chainKey.toLowerCase() === targetChain.toLowerCase();
       }
 
-      // In EVM tab, strictly exclude Solana!
-      if (filterScope === "evm" && chainKey.toLowerCase() === "sol") return false;
-      // In SOL tab, strictly exclude EVM chains!
+      // In BTC tab, strictly include only BTC!
+      if (filterScope === "btc" && chainKey.toLowerCase() !== "btc") return false;
+      // In EVM tab, strictly exclude Solana and Bitcoin!
+      if (filterScope === "evm" && (chainKey.toLowerCase() === "sol" || chainKey.toLowerCase() === "btc")) return false;
+      // In SOL tab, strictly include only Solana!
       if (filterScope === "sol" && chainKey.toLowerCase() !== "sol") return false;
       return true;
     })
@@ -144,6 +148,7 @@ const WalletRow = memo(function WalletRow({
         return tok.chain.toLowerCase() === targetChain.toLowerCase();
       }
 
+      if (filterScope === "btc") return false;
       if (filterScope === "evm" && tok.chain.toLowerCase() === "sol") return false;
       if (filterScope === "sol" && tok.chain.toLowerCase() !== "sol") return false;
       return true;
@@ -168,18 +173,23 @@ const WalletRow = memo(function WalletRow({
   // Address MUST ALWAYS match the exact network family of the balance being highlighted!
   let displayAddress: string | null = null;
 
-  if (targetChain === "sol" || filterScope === "sol") {
-    displayAddress = wallet.solAddress ?? wallet.address;
+  if (targetChain === "btc" || filterScope === "btc") {
+    displayAddress = wallet.btcAddress ?? wallet.address ?? wallet.solAddress;
+  } else if (targetChain === "sol" || filterScope === "sol") {
+    displayAddress = wallet.solAddress ?? wallet.address ?? wallet.btcAddress;
   } else if ((targetChain && targetChain !== "all") || filterScope === "evm") {
-    displayAddress = wallet.address ?? wallet.solAddress;
+    displayAddress = wallet.address ?? wallet.solAddress ?? wallet.btcAddress;
   } else {
     // In "all" or "funded" tab:
+    // If the top holding is on Bitcoin, display Bitcoin address!
     // If the top holding is on Solana, display Solana address!
     // If the top holding is on EVM, display EVM address!
-    if (primaryHolding && primaryHolding.chainKey.toLowerCase() === "sol") {
-      displayAddress = wallet.solAddress ?? wallet.address;
+    if (primaryHolding && primaryHolding.chainKey.toLowerCase() === "btc") {
+      displayAddress = wallet.btcAddress ?? wallet.address ?? wallet.solAddress;
+    } else if (primaryHolding && primaryHolding.chainKey.toLowerCase() === "sol") {
+      displayAddress = wallet.solAddress ?? wallet.address ?? wallet.btcAddress;
     } else {
-      displayAddress = wallet.address ?? wallet.solAddress;
+      displayAddress = wallet.address ?? wallet.solAddress ?? wallet.btcAddress;
     }
   }
 
@@ -189,6 +199,9 @@ const WalletRow = memo(function WalletRow({
   const totalExtraCount = remainingNative.length + remainingTokens.length;
 
   const isFundedInScope = useMemo(() => {
+    if (filterScope === "btc") {
+      return hasFundsOnChain("btc", wallet.balances, wallet.tokens);
+    }
     if (filterScope === "evm") {
       return hasFundsOnEvm(wallet.balances, wallet.tokens);
     }
@@ -343,6 +356,21 @@ export function Sidebar() {
     });
   }, [filteredWallets]);
 
+  const btcWallets = useMemo(() => {
+    const arr = filteredWallets.filter((w) => Boolean(w.btcAddress));
+    return arr.slice().sort((a, b) => {
+      const aFunds = hasFundsOnChain("btc", a.balances, a.tokens);
+      const bFunds = hasFundsOnChain("btc", b.balances, b.tokens);
+      if (aFunds !== bFunds) return bFunds ? 1 : -1;
+      if (aFunds && bFunds) {
+        const balA = balanceAmount(a.balances["btc"]);
+        const balB = balanceAmount(b.balances["btc"]);
+        if (balB !== balA) return balB - balA;
+      }
+      return a.id - b.id;
+    });
+  }, [filteredWallets]);
+
   const solWallets = useMemo(() => {
     const arr = filteredWallets.filter((w) => Boolean(w.solAddress));
     return arr.slice().sort((a, b) => {
@@ -380,6 +408,10 @@ export function Sidebar() {
     () => wallets.filter((w) => hasFundsOnChain("arb", w.balances, w.tokens)).length,
     [wallets],
   );
+  const btcFundedCount = useMemo(
+    () => wallets.filter((w) => hasFundsOnChain("btc", w.balances, w.tokens)).length,
+    [wallets],
+  );
 
   const list = useMemo(() => {
     if (filter === "funded") {
@@ -394,17 +426,25 @@ export function Sidebar() {
       }
       return res;
     }
+    if (filter === "btc") return btcWallets;
     if (filter === "evm") return evmWallets;
     if (filter === "sol") return solWallets;
     return filteredWallets;
-  }, [filter, chainFilter, filteredWallets, evmWallets, solWallets]);
+  }, [filter, chainFilter, filteredWallets, btcWallets, evmWallets, solWallets]);
 
   const fundedCount = useMemo(() => wallets.filter((w) => w.hasFunds).length, [wallets]);
   const evmFundedCount = useMemo(
     () => wallets.filter((w) => Boolean(w.address) && hasFundsOnEvm(w.balances, w.tokens)).length,
     [wallets],
   );
-  const activeScopeFundedCount = filter === "evm" ? evmFundedCount : filter === "sol" ? solFundedCount : fundedCount;
+  const activeScopeFundedCount =
+    filter === "btc"
+      ? btcFundedCount
+      : filter === "evm"
+        ? evmFundedCount
+        : filter === "sol"
+          ? solFundedCount
+          : fundedCount;
   const isAllFundedSelected = activeScopeFundedCount > 0 && selectedSweepIds.size >= activeScopeFundedCount;
   const selectedFamily = useMemo<"evm" | "sol" | null>(() => {
     if (selectedSweepIds.size === 0) return null;
@@ -467,7 +507,7 @@ export function Sidebar() {
           />
         </div>
 
-        <div className="filter-tabs filter-tabs-4">
+        <div className="filter-tabs filter-tabs-5">
           <button
             type="button"
             className={`filter-tab${filter === "all" ? " active" : ""}`}
@@ -484,6 +524,16 @@ export function Sidebar() {
             onClick={() => setFilter("funded")}
           >
             Funded <span className="tab-pill-count funded-pill">{fundedCount}</span>
+          </button>
+          <button
+            type="button"
+            className={`filter-tab btc-tab${filter === "btc" ? " active" : ""}`}
+            onClick={() => {
+              setFilter("btc");
+              setChainFilter("all");
+            }}
+          >
+            BTC
           </button>
           <button
             type="button"
@@ -538,6 +588,13 @@ export function Sidebar() {
               onClick={() => setChainFilter(chainFilter === "eth" ? "all" : "eth")}
             >
               <ChainIcon chain="eth" size={11} /> ETH ({ethFundedCount})
+            </button>
+            <button
+              type="button"
+              className={`chain-pill chain-pill-btc ${chainFilter === "btc" ? "active" : ""}`}
+              onClick={() => setChainFilter(chainFilter === "btc" ? "all" : "btc")}
+            >
+              <ChainIcon chain="btc" size={11} /> BTC ({btcFundedCount})
             </button>
             {baseFundedCount > 0 && (
               <button

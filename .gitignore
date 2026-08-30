@@ -16,6 +16,8 @@ dist-ssr
 # Tauri / Rust
 src-tauri/target
 target/
+src-tauri/target_check/
+target_check/
 src-tauri/gen
 
 # Database & Sensitive
@@ -44,6 +46,8 @@ gambar/
 
 # Private Architecture & Internal Docs
 docs/
+*ROADMAP*.md
+PLURIVEX_*.md
 
 # Deprecated / dead code staged for removal (not tracked, not shipped)
 _deprecated/

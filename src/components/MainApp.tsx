@@ -6,12 +6,14 @@ import { WalletDetail } from "./WalletDetail";
 import { SweeperWorkspace } from "./SweeperWorkspace";
 import { ExportModal } from "./ExportModal";
 import { ResetAllWalletsModal } from "./ResetAllWalletsModal";
+import { MnemonicRepairModal } from "./MnemonicRepairModal";
 import { WindowControls } from "./WindowControls";
 import { IconWallet, IconScan, IconLock, IconSeed, IconKey, IconWalletImport, IconExport, IconTrash, IconFolder, IconSearch } from "../icons";
 
 export function MainApp() {
   const [mainView, setMainView] = useState<"detail" | "sweeper">("detail");
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [isMnemonicRepairOpen, setIsMnemonicRepairOpen] = useState<boolean>(false);
   const {
     wallets,
     selectedId,
@@ -74,6 +76,16 @@ export function MainApp() {
             >
               <IconWalletImport size={13} />
               <span>Import</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-action-minimal btn-repair-header"
+              onClick={() => setIsMnemonicRepairOpen(true)}
+              title="Mnemonic Typo Repair Tool (BIP-39 Levenshtein Heuristic Recovery)"
+            >
+              <IconSeed size={13} />
+              <span>Typo Repair</span>
             </button>
 
             <button
@@ -296,6 +308,12 @@ export function MainApp() {
 
       {/* Floating Draggable Import Window */}
       <FloatingImport open={isImportOpen} onClose={() => setIsImportOpen(false)} />
+
+      {/* Mnemonic Typo Repair Forensic Modal */}
+      <MnemonicRepairModal
+        isOpen={isMnemonicRepairOpen}
+        onClose={() => setIsMnemonicRepairOpen(false)}
+      />
     </div>
   );
 }

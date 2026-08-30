@@ -125,8 +125,11 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
 
   const evmAddr = wallet.address || dualCreds?.evmAddress;
   const solAddr = wallet.solAddress || dualCreds?.solAddress;
+  const btcAddr = wallet.btcAddress || dualCreds?.btcAddress;
+  const btcLegacyAddr = dualCreds?.btcLegacyAddress;
   const evmPk = dualCreds?.evmPrivateKey;
   const solPk = dualCreds?.solPrivateKey;
+  const btcPk = dualCreds?.btcPrivateKey;
   const isSol = Boolean(wallet.solAddress && !wallet.address);
 
   const fetchSolAccount = useCallback(() => {
@@ -170,6 +173,18 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     toast("Solana Address copied to clipboard", "success");
   };
 
+  const copyBtcAddr = () => {
+    if (!btcAddr) return;
+    navigator.clipboard.writeText(btcAddr);
+    toast("Bitcoin Native SegWit Address copied to clipboard", "success");
+  };
+
+  const copyBtcLegacyAddr = () => {
+    if (!btcLegacyAddr) return;
+    navigator.clipboard.writeText(btcLegacyAddr);
+    toast("Bitcoin Legacy Address copied to clipboard", "success");
+  };
+
   const copyEvmPk = async () => {
     if (!evmPk) return;
     await copySensitiveToClipboard(evmPk, 30000);
@@ -180,6 +195,12 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     if (!solPk) return;
     await copySensitiveToClipboard(solPk, 30000);
     toast("Solana Private Key copied! Auto-clears in 30s for security", "success");
+  };
+
+  const copyBtcPk = async () => {
+    if (!btcPk) return;
+    await copySensitiveToClipboard(btcPk, 30000);
+    toast("Bitcoin WIF Private Key copied! Auto-clears in 30s for security", "success");
   };
 
   const copySeed = async () => {
@@ -281,9 +302,9 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
           <div className="hero-tags-group">
             <span className="hero-type-badge">
               {wallet.type === "seed"
-                ? "DUAL BIP-39 SEED"
+                ? "TRI-CHAIN BIP-39 SEED"
                 : wallet.type === "pk"
-                  ? "DUAL EVM + SOLANA KEY"
+                  ? "MULTI-CHAIN KEY"
                   : "SOLANA KEY"}
             </span>
             {wallet.hasFunds && <span className="hero-funded-pill">Funded Asset</span>}
@@ -529,6 +550,50 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
               </div>
             </div>
           </div>
+
+          {/* Bitcoin Credentials Box */}
+          {(btcAddr || btcLegacyAddr) && (
+            <div className="credential-box btc-box">
+              <div className="credential-header-bar">
+                <span className="credential-label" style={{ color: "#f7931a" }}>BITCOIN IDENTITY (SEGWIT / LEGACY)</span>
+                {btcAddr && (
+                  <button type="button" className="btn-credential-action" onClick={copyBtcAddr}>
+                    Copy BTC
+                  </button>
+                )}
+              </div>
+              <div className="credential-body">
+                <div className="credential-row">
+                  <span className="credential-sub-lbl mono">Native SegWit:</span>
+                  <span className="credential-val mono" onClick={copyBtcAddr} title="Click to copy Bitcoin Native SegWit address">
+                    {btcAddr ?? "Not derived"}
+                  </span>
+                </div>
+                {btcLegacyAddr && (
+                  <div className="credential-row">
+                    <span className="credential-sub-lbl mono">Legacy (1...):</span>
+                    <span className="credential-val mono" onClick={copyBtcLegacyAddr} title="Click to copy Bitcoin Legacy address">
+                      {btcLegacyAddr}
+                    </span>
+                    <button type="button" className="btn-credential-action" onClick={copyBtcLegacyAddr}>
+                      Copy 1...
+                    </button>
+                  </div>
+                )}
+                <div className="credential-row">
+                  <span className="credential-sub-lbl mono">WIF Key:</span>
+                  <span className="credential-val mono secret-val">
+                    {revealed && btcPk ? btcPk : "••••••••••••••••••••••••••••••••"}
+                  </span>
+                  {revealed && btcPk && (
+                    <button type="button" className="btn-credential-action" onClick={copyBtcPk}>
+                      Copy WIF
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* BIP-39 Master Mnemonic Banner (If wallet is seed phrase) */}

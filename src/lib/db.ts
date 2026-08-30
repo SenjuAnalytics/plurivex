@@ -44,18 +44,20 @@ export async function insertWallet(data: {
   fingerprint: string;
   address: string | null;
   solAddress?: string | null;
+  btcAddress?: string | null;
   wordCount: number | null;
 }) {
   const database = await getDb();
   const result = await database.execute(
-    `INSERT INTO wallets (type, encrypted_secret, fingerprint, address, sol_address, word_count, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO wallets (type, encrypted_secret, fingerprint, address, sol_address, btc_address, word_count, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       data.type,
       data.encryptedSecret,
       data.fingerprint,
       data.address,
       data.solAddress ?? null,
+      data.btcAddress ?? null,
       data.wordCount,
       new Date().toISOString(),
     ],
@@ -70,6 +72,7 @@ export async function insertWalletsBatch(
     fingerprint: string;
     address: string | null;
     solAddress?: string | null;
+    btcAddress?: string | null;
     wordCount: number | null;
   }[],
 ) {
@@ -84,9 +87,9 @@ export async function insertWalletsBatch(
     const params: (string | number | null)[] = [];
 
     chunk.forEach((data, idx) => {
-      const base = idx * 7;
+      const base = idx * 8;
       valuePlaceholders.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`,
       );
       params.push(
         data.type,
@@ -94,12 +97,13 @@ export async function insertWalletsBatch(
         data.fingerprint,
         data.address,
         data.solAddress ?? null,
+        data.btcAddress ?? null,
         data.wordCount,
         now,
       );
     });
 
-    const sql = `INSERT OR IGNORE INTO wallets (type, encrypted_secret, fingerprint, address, sol_address, word_count, created_at) VALUES ${valuePlaceholders.join(", ")}`;
+    const sql = `INSERT OR IGNORE INTO wallets (type, encrypted_secret, fingerprint, address, sol_address, btc_address, word_count, created_at) VALUES ${valuePlaceholders.join(", ")}`;
     await database.execute(sql, params);
   }
 }
@@ -113,6 +117,7 @@ export async function getAllWallets(): Promise<WalletRecord[]> {
       encrypted_secret: string;
       address: string | null;
       sol_address: string | null;
+      btc_address: string | null;
       word_count: number | null;
       label: string | null;
       created_at: string;
@@ -196,6 +201,7 @@ export async function getAllWallets(): Promise<WalletRecord[]> {
       encryptedSecret: r.encrypted_secret,
       address: r.address,
       solAddress: r.sol_address,
+      btcAddress: r.btc_address,
       wordCount: r.word_count,
       label: r.label,
       createdAt: r.created_at,
@@ -251,13 +257,15 @@ export async function getExistingFingerprints(): Promise<Set<string>> {
 export async function getExistingAddresses(): Promise<{
   evm: Map<string, { id: number; type: WalletType }>;
   sol: Map<string, { id: number; type: WalletType }>;
+  btc: Map<string, { id: number; type: WalletType }>;
 }> {
   const database = await getDb();
-  const rows = await database.select<{ id: number; type: WalletType; address: string | null; sol_address: string | null }[]>(
-    "SELECT id, type, address, sol_address FROM wallets",
+  const rows = await database.select<{ id: number; type: WalletType; address: string | null; sol_address: string | null; btc_address: string | null }[]>(
+    "SELECT id, type, address, sol_address, btc_address FROM wallets",
   );
   const evm = new Map<string, { id: number; type: WalletType }>();
   const sol = new Map<string, { id: number; type: WalletType }>();
+  const btc = new Map<string, { id: number; type: WalletType }>();
   for (const r of rows) {
     if (r.address) {
       evm.set(r.address.toLowerCase(), { id: r.id, type: r.type });
@@ -265,8 +273,11 @@ export async function getExistingAddresses(): Promise<{
     if (r.sol_address) {
       sol.set(r.sol_address, { id: r.id, type: r.type });
     }
+    if (r.btc_address) {
+      btc.set(r.btc_address, { id: r.id, type: r.type });
+    }
   }
-  return { evm, sol };
+  return { evm, sol, btc };
 }
 
 export async function upgradeWalletToSeed(
@@ -287,9 +298,17 @@ export async function updateWalletLabel(id: number, label: string | null) {
   await database.execute("UPDATE wallets SET label = $1 WHERE id = $2", [label, id]);
 }
 
-export async function updateWalletAddresses(id: number, address: string | null, solAddress: string | null) {
+export async function updateWalletAddresses(
+  id: number,
+  address: string | null,
+  solAddress: string | null,
+  btcAddress?: string | null,
+) {
   const database = await getDb();
-  await database.execute("UPDATE wallets SET address = $1, sol_address = $2 WHERE id = $3", [address, solAddress, id]);
+  await database.execute(
+    "UPDATE wallets SET address = $1, sol_address = $2, btc_address = $3 WHERE id = $4",
+    [address, solAddress, btcAddress ?? null, id],
+  );
 }
 
 export async function cleanupDuplicateWallets(): Promise<number> {

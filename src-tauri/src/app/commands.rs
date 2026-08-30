@@ -146,6 +146,14 @@ pub async fn vault_encrypt(plaintext: String, password: String) -> Result<String
 }
 
 #[tauri::command]
+pub async fn vault_encrypt_batch(
+    plaintexts: Vec<String>,
+    password: String,
+) -> Result<Vec<String>, String> {
+    crate::core::security::crypto::encrypt_vault_batch(&plaintexts, &password)
+}
+
+#[tauri::command]
 pub async fn vault_decrypt(blob: String, password: String) -> Result<String, String> {
     crate::core::security::crypto::decrypt_vault(&blob, &password)
 }
@@ -169,8 +177,29 @@ pub async fn vault_derive_credentials(
 }
 
 #[tauri::command]
+pub async fn vault_derive_credentials_batch(
+    secrets: Vec<String>,
+    wallet_type: String,
+) -> Result<Vec<Option<crate::core::wallets::derivation::DualCredentials>>, String> {
+    Ok(crate::core::wallets::derivation::derive_dual_credentials_batch_native(&secrets, &wallet_type))
+}
+
+#[tauri::command]
 pub async fn vault_validate_mnemonic(phrase: String) -> Result<bool, String> {
     Ok(crate::core::wallets::derivation::is_valid_mnemonic_phrase(&phrase))
+}
+
+#[tauri::command]
+pub async fn vault_repair_mnemonic(
+    phrase: String,
+    target_address: Option<String>,
+    missing_position: Option<usize>,
+) -> Result<crate::core::wallets::repair::MnemonicRepairResult, String> {
+    Ok(crate::core::wallets::repair::analyze_and_repair_mnemonic(
+        &phrase,
+        target_address.as_deref(),
+        missing_position,
+    ))
 }
 
 #[cfg(test)]

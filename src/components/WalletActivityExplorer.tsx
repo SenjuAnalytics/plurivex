@@ -8,20 +8,33 @@ export function WalletActivityExplorer({ wallet }: { wallet: WalletView }) {
   const address = walletDisplayAddress(wallet) || "";
   const isSol = isSolanaWallet(wallet.type);
 
-  const explorers = isSol
-    ? [
-        { name: "Solscan", url: `https://solscan.io/account/${address}`, desc: "Official Solana Explorer" },
-        { name: "SolanaFM", url: `https://solana.fm/address/${address}`, desc: "Fast Solana Analytics" },
-        { name: "Step Finance", url: `https://app.step.finance/en/dashboard?watching=${address}`, desc: "Solana Portfolio Manager" },
-      ]
-    : [
-        { name: "DeBank", url: `https://debank.com/profile/${address}`, desc: "Universal Multi-Chain Portfolio", icon: "eth" },
-        { name: "Etherscan", url: `https://etherscan.io/address/${address}`, desc: "Ethereum L1 Mainnet", icon: "eth" },
-        { name: "BscScan", url: `https://bscscan.com/address/${address}`, desc: "BNB Smart Chain Explorer", icon: "bsc" },
-        { name: "BaseScan", url: `https://basescan.org/address/${address}`, desc: "Coinbase Base Network", icon: "base" },
-        { name: "Arbiscan", url: `https://arbiscan.io/address/${address}`, desc: "Arbitrum One L2 Explorer", icon: "arb" },
-        { name: "Arkham Intelligence", url: `https://platform.arkhamintelligence.com/explorer/address/${address}`, desc: "On-Chain Entity Intelligence" },
-      ];
+  const btcAddr = wallet.btcAddress;
+
+  const explorers: { name: string; url: string; desc: string; icon?: string }[] = [];
+
+  if (btcAddr) {
+    explorers.push(
+      { name: "Mempool.space", url: `https://mempool.space/address/${btcAddr}`, desc: "Leading Bitcoin Blockchain Explorer", icon: "btc" },
+      { name: "Blockstream", url: `https://blockstream.info/address/${btcAddr}`, desc: "Esplora Bitcoin Visualizer", icon: "btc" },
+    );
+  }
+
+  if (isSol) {
+    explorers.push(
+      { name: "Solscan", url: `https://solscan.io/account/${address}`, desc: "Official Solana Explorer", icon: "sol" },
+      { name: "SolanaFM", url: `https://solana.fm/address/${address}`, desc: "Fast Solana Analytics", icon: "sol" },
+      { name: "Step Finance", url: `https://app.step.finance/en/dashboard?watching=${address}`, desc: "Solana Portfolio Manager", icon: "sol" },
+    );
+  } else {
+    explorers.push(
+      { name: "DeBank", url: `https://debank.com/profile/${address}`, desc: "Universal Multi-Chain Portfolio", icon: "eth" },
+      { name: "Etherscan", url: `https://etherscan.io/address/${address}`, desc: "Ethereum L1 Mainnet", icon: "eth" },
+      { name: "BscScan", url: `https://bscscan.com/address/${address}`, desc: "BNB Smart Chain Explorer", icon: "bsc" },
+      { name: "BaseScan", url: `https://basescan.org/address/${address}`, desc: "Coinbase Base Network", icon: "base" },
+      { name: "Arbiscan", url: `https://arbiscan.io/address/${address}`, desc: "Arbitrum One L2 Explorer", icon: "arb" },
+      { name: "Arkham Intelligence", url: `https://platform.arkhamintelligence.com/explorer/address/${address}`, desc: "On-Chain Entity Intelligence" },
+    );
+  }
 
   const handleOpenUrl = (url: string) => {
     window.open(url, "_blank");

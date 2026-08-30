@@ -10,6 +10,10 @@ export async function encrypt(plaintext: string, password: string): Promise<stri
   return await invoke<string>("vault_encrypt", { plaintext, password });
 }
 
+export async function encryptBatch(plaintexts: string[], password: string): Promise<string[]> {
+  return await invoke<string[]>("vault_encrypt_batch", { plaintexts, password });
+}
+
 export async function decrypt(blob: string, password: string): Promise<string> {
   return await invoke<string>("vault_decrypt", { blob, password });
 }

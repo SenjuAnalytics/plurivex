@@ -25,6 +25,7 @@ export interface WalletRecord {
   encryptedSecret: string;
   address: string | null;
   solAddress: string | null;
+  btcAddress: string | null;
   wordCount: number | null;
   label: string | null;
   createdAt: string;
