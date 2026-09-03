@@ -32,7 +32,7 @@ base64 = "0.22"
 rand = "0.8"
 k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.10"
-bip39 = "2.0"
+bip39 = { version = "2.0", features = ["all-languages"] }
 bip32 = "0.5"
 ed25519-dalek = "2.1"
 hex = "0.4"
@@ -40,4 +40,5 @@ bs58 = "0.5"
 hmac = "0.12"
 ripemd = "0.1"
 bech32 = "0.9"
+rayon = "1.10"
 

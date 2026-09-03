@@ -1,0 +1,449 @@
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Instant;
+
+use crate::core::wallets::repair::{
+    check_target_match, detect_mnemonic_language, fast_validate_12_words, TargetAddressMatch,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoverySessionStatusResponse {
+    pub session_id: String,
+    pub id: String, // Alias for backward compatibility with frontend rec.id
+    pub status: String,
+    pub current_index: usize,
+    pub total_combinations: usize,
+    pub percent: f64,
+    pub solutions_count: usize,
+    pub speed_cps: f64, // combinations per second
+    pub eta_seconds: Option<f64>,
+    pub target_match: Option<TargetAddressMatch>,
+    pub recent_solutions: Vec<String>,
+}
+
+// Global active session tracker in RAM (100% Zero-Disk)
+static ACTIVE_SESSION_ID: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+static ACTIVE_RAW_PHRASE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+static ACTIVE_TARGET_ADDR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+static PAUSE_FLAG: AtomicBool = AtomicBool::new(false);
+static CANCEL_FLAG: AtomicBool = AtomicBool::new(false);
+static CURRENT_INDEX: AtomicUsize = AtomicUsize::new(0);
+static SOLUTIONS_COUNT: AtomicUsize = AtomicUsize::new(0);
+static TOTAL_COMBINATIONS: AtomicUsize = AtomicUsize::new(0);
+static SESSION_START_TIME: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+static CACHED_TARGET_MATCH: std::sync::Mutex<Option<TargetAddressMatch>> =
+    std::sync::Mutex::new(None);
+static CACHED_SOLUTIONS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+pub fn get_current_active_session_id() -> Option<String> {
+    ACTIVE_SESSION_ID.lock().unwrap().clone()
+}
+
+pub fn start_in_memory_session(
+    phrase: String,
+    target_address: Option<String>,
+    _search_type: String,
+) -> Result<RecoverySessionStatusResponse, String> {
+    let session_id = format!("ses_{}", hex::encode(rand::random::<[u8; 8]>()));
+
+    let tokens: Vec<&str> = phrase.split_whitespace().collect();
+    let mut missing_count = 0;
+    for t in &tokens {
+        if crate::core::wallets::repair::is_placeholder_token(t) {
+            missing_count += 1;
+        }
+    }
+    let is_all_66_pairs = tokens.len() == 10 && missing_count == 0;
+    let total_combinations = if missing_count == 1 || (tokens.len() == 11 && missing_count == 0) {
+        2048
+    } else if is_all_66_pairs {
+        66 * 4_194_304
+    } else {
+        4_194_304
+    };
+
+    // Store in-memory session parameters
+    {
+        *ACTIVE_SESSION_ID.lock().unwrap() = Some(session_id.clone());
+        *ACTIVE_RAW_PHRASE.lock().unwrap() = Some(phrase.clone());
+        *ACTIVE_TARGET_ADDR.lock().unwrap() = target_address.clone();
+        PAUSE_FLAG.store(false, Ordering::SeqCst);
+        CANCEL_FLAG.store(false, Ordering::SeqCst);
+        CURRENT_INDEX.store(0, Ordering::SeqCst);
+        SOLUTIONS_COUNT.store(0, Ordering::SeqCst);
+        TOTAL_COMBINATIONS.store(total_combinations, Ordering::SeqCst);
+        *SESSION_START_TIME.lock().unwrap() = Some(Instant::now());
+        *CACHED_TARGET_MATCH.lock().unwrap() = None;
+        CACHED_SOLUTIONS.lock().unwrap().clear();
+    }
+
+    run_dual_word_session_worker(
+        session_id.clone(),
+        phrase,
+        target_address,
+        0,
+        total_combinations,
+    );
+
+    Ok(RecoverySessionStatusResponse {
+        session_id: session_id.clone(),
+        id: session_id,
+        status: "running".to_string(),
+        current_index: 0,
+        total_combinations,
+        percent: 0.0,
+        solutions_count: 0,
+        speed_cps: 0.0,
+        eta_seconds: None,
+        target_match: None,
+        recent_solutions: Vec::new(),
+    })
+}
+
+pub fn request_pause_session(session_id: &str) -> Result<bool, String> {
+    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    if active.as_deref() == Some(session_id) {
+        PAUSE_FLAG.store(true, Ordering::SeqCst);
+        Ok(true)
+    } else {
+        Err(format!(
+            "Session {} is not actively running in memory",
+            session_id
+        ))
+    }
+}
+
+pub fn request_resume_session(session_id: &str) -> Result<bool, String> {
+    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    if active.as_deref() != Some(session_id) {
+        return Err(format!("Session {} is not active in memory", session_id));
+    }
+    drop(active);
+
+    let phrase = ACTIVE_RAW_PHRASE
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "Session phrase expired from RAM".to_string())?;
+    let target = ACTIVE_TARGET_ADDR.lock().unwrap().clone();
+    let current_idx = CURRENT_INDEX.load(Ordering::SeqCst);
+    let total = TOTAL_COMBINATIONS.load(Ordering::SeqCst);
+
+    PAUSE_FLAG.store(false, Ordering::SeqCst);
+    CANCEL_FLAG.store(false, Ordering::SeqCst);
+
+    run_dual_word_session_worker(session_id.to_string(), phrase, target, current_idx, total);
+
+    Ok(true)
+}
+
+pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
+    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    if active.as_deref() == Some(session_id) {
+        CANCEL_FLAG.store(true, Ordering::SeqCst);
+        Ok(true)
+    } else {
+        Err(format!(
+            "Session {} is not actively running in memory",
+            session_id
+        ))
+    }
+}
+
+pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatusResponse, String> {
+    let active = ACTIVE_SESSION_ID.lock().unwrap().clone();
+    let is_active = active.as_deref() == Some(session_id);
+
+    if is_active {
+        let current_idx = CURRENT_INDEX.load(Ordering::Relaxed);
+        let total = TOTAL_COMBINATIONS.load(Ordering::Relaxed);
+        let sol_cnt = SOLUTIONS_COUNT.load(Ordering::Relaxed);
+
+        let elapsed = SESSION_START_TIME
+            .lock()
+            .unwrap()
+            .map(|t| t.elapsed().as_secs_f64())
+            .unwrap_or(0.0);
+
+        let speed = if elapsed > 0.1 {
+            current_idx as f64 / elapsed
+        } else {
+            0.0
+        };
+
+        let percent = if total > 0 {
+            ((current_idx as f64 / total as f64) * 100.0).min(100.0)
+        } else {
+            0.0
+        };
+
+        let remaining = total.saturating_sub(current_idx);
+        let eta = if speed > 10.0 && remaining > 0 {
+            Some(remaining as f64 / speed)
+        } else {
+            None
+        };
+
+        let target_match = CACHED_TARGET_MATCH.lock().unwrap().clone();
+        let cached_sols = CACHED_SOLUTIONS.lock().unwrap().clone();
+
+        let status_str = if CANCEL_FLAG.load(Ordering::SeqCst) {
+            "cancelled".to_string()
+        } else if PAUSE_FLAG.load(Ordering::SeqCst) {
+            "paused".to_string()
+        } else if current_idx >= total && total > 0 {
+            "completed".to_string()
+        } else {
+            "running".to_string()
+        };
+
+        Ok(RecoverySessionStatusResponse {
+            session_id: session_id.to_string(),
+            id: session_id.to_string(),
+            status: status_str,
+            current_index: current_idx,
+            total_combinations: total,
+            percent,
+            solutions_count: sol_cnt,
+            speed_cps: speed,
+            eta_seconds: eta,
+            target_match,
+            recent_solutions: cached_sols,
+        })
+    } else {
+        Err(format!("Session {} is not active in RAM", session_id))
+    }
+}
+
+/// Execute interruptible dual-word solver loop in pure RAM
+pub fn run_dual_word_session_worker(
+    session_id: String,
+    raw_phrase: String,
+    target_address: Option<String>,
+    start_from_index: usize,
+    _total_combinations: usize,
+) {
+    std::thread::spawn(move || {
+        // Parse words & identify missing slot positions
+        let tokens: Vec<&str> = raw_phrase.split_whitespace().collect();
+        let (lang, _) = detect_mnemonic_language(&tokens);
+        let word_list = lang.word_list();
+
+        let mut missing_word_indices = Vec::new();
+        for (i, t) in tokens.iter().enumerate() {
+            if crate::core::wallets::repair::is_placeholder_token(t) {
+                missing_word_indices.push(i);
+            }
+        }
+
+        let is_all_66_pairs = tokens.len() == 10 && missing_word_indices.is_empty();
+        let all_pairs: Vec<(usize, usize)> = if is_all_66_pairs {
+            let mut pairs = Vec::with_capacity(66);
+            for p in 0..11 {
+                pairs.push((p, p + 1));
+            }
+            for p1 in 0..11 {
+                for p2 in (p1 + 1)..12 {
+                    if !pairs.contains(&(p1, p2)) {
+                        pairs.push((p1, p2));
+                    }
+                }
+            }
+            pairs
+        } else if missing_word_indices.len() == 2 {
+            vec![(missing_word_indices[0], missing_word_indices[1])]
+        } else if missing_word_indices.len() == 1 {
+            vec![(missing_word_indices[0], 0)]
+        } else {
+            vec![(10, 11)]
+        };
+
+        let effective_total_combinations = if missing_word_indices.len() == 1 {
+            2048
+        } else if is_all_66_pairs {
+            66 * 4_194_304
+        } else {
+            4_194_304
+        };
+
+        // Initialize active session tracker in RAM
+        {
+            *ACTIVE_SESSION_ID.lock().unwrap() = Some(session_id.clone());
+            PAUSE_FLAG.store(false, Ordering::SeqCst);
+            CANCEL_FLAG.store(false, Ordering::SeqCst);
+            CURRENT_INDEX.store(start_from_index, Ordering::SeqCst);
+            TOTAL_COMBINATIONS.store(effective_total_combinations, Ordering::SeqCst);
+            *SESSION_START_TIME.lock().unwrap() = Some(Instant::now());
+        }
+
+        let clean_target = target_address.as_ref().map(|s| s.trim().to_string());
+        let mut found_target_match: Option<TargetAddressMatch> =
+            CACHED_TARGET_MATCH.lock().unwrap().clone();
+
+        let extract_base_indices =
+            |tokens: &[&str], missing: &[usize], wlist: &[&'static str]| -> [u16; 12] {
+                let mut base_indices = [0u16; 12];
+                if tokens.len() == 12 {
+                    for (i, &t) in tokens.iter().enumerate() {
+                        if !missing.contains(&i) {
+                            if let Some(pos) = wlist.iter().position(|&item| item == t) {
+                                base_indices[i] = pos as u16;
+                            }
+                        }
+                    }
+                } else {
+                    let non_ph: Vec<&str> = tokens
+                        .iter()
+                        .copied()
+                        .filter(|&t| !crate::core::wallets::repair::is_placeholder_token(t))
+                        .collect();
+                    let mut orig_idx = 0;
+                    for (i, val) in base_indices.iter_mut().enumerate() {
+                        if !missing.contains(&i) && orig_idx < non_ph.len() {
+                            let t = non_ph[orig_idx];
+                            orig_idx += 1;
+                            if let Some(pos) = wlist.iter().position(|&item| item == t) {
+                                *val = pos as u16;
+                            }
+                        }
+                    }
+                }
+                base_indices
+            };
+
+        if missing_word_indices.len() == 1 {
+            let p1 = missing_word_indices[0];
+            let base_indices = extract_base_indices(&tokens, &missing_word_indices, word_list);
+
+            'outer1: for w1 in 0..2048u16 {
+                if (w1 as usize) < start_from_index {
+                    continue;
+                }
+
+                CURRENT_INDEX.store((w1 as usize) + 1, Ordering::Relaxed);
+
+                let mut test_indices = base_indices;
+                test_indices[p1] = w1;
+
+                if fast_validate_12_words(&test_indices) {
+                    let phrase = test_indices
+                        .iter()
+                        .map(|&idx| word_list[idx as usize])
+                        .collect::<Vec<&str>>()
+                        .join(" ");
+
+                    {
+                        let mut guard = CACHED_SOLUTIONS.lock().unwrap();
+                        if guard.len() < 1000 {
+                            guard.push(phrase.clone());
+                        }
+                    }
+                    SOLUTIONS_COUNT.fetch_add(1, Ordering::Relaxed);
+
+                    if found_target_match.is_none() {
+                        if let Some(ref target) = clean_target {
+                            if let Some(m) =
+                                check_target_match(target, &phrase, p1, word_list[w1 as usize])
+                            {
+                                found_target_match = Some(m.clone());
+                                *CACHED_TARGET_MATCH.lock().unwrap() = Some(m);
+                            }
+                        }
+                    }
+                }
+
+                if PAUSE_FLAG.load(Ordering::Relaxed) || CANCEL_FLAG.load(Ordering::Relaxed) {
+                    break 'outer1;
+                }
+            }
+        } else {
+            'outer_all_pairs: for (pair_idx, &(p1, p2)) in all_pairs.iter().enumerate() {
+                let base_indices = extract_base_indices(&tokens, &[p1, p2], word_list);
+                let pair_offset = pair_idx * 4_194_304;
+
+                for w1 in 0..2048u16 {
+                    let mut test_indices = base_indices;
+                    test_indices[p1] = w1;
+
+                    for w2 in 0..2048u16 {
+                        let combo_idx = pair_offset + (w1 as usize) * 2048 + (w2 as usize);
+                        if combo_idx < start_from_index {
+                            continue;
+                        }
+
+                        CURRENT_INDEX.store(combo_idx + 1, Ordering::Relaxed);
+
+                        test_indices[p2] = w2;
+
+                        if fast_validate_12_words(&test_indices) {
+                            let phrase = test_indices
+                                .iter()
+                                .map(|&idx| word_list[idx as usize])
+                                .collect::<Vec<&str>>()
+                                .join(" ");
+
+                            {
+                                let mut guard = CACHED_SOLUTIONS.lock().unwrap();
+                                if guard.len() < 1000 {
+                                    guard.push(phrase.clone());
+                                }
+                            }
+                            SOLUTIONS_COUNT.fetch_add(1, Ordering::Relaxed);
+
+                            if found_target_match.is_none() {
+                                if let Some(ref target) = clean_target {
+                                    if let Some(m) = check_target_match(
+                                        target,
+                                        &phrase,
+                                        p1,
+                                        word_list[w1 as usize],
+                                    ) {
+                                        found_target_match = Some(m.clone());
+                                        *CACHED_TARGET_MATCH.lock().unwrap() = Some(m);
+                                    }
+                                }
+                            }
+                        }
+
+                        if PAUSE_FLAG.load(Ordering::Relaxed) || CANCEL_FLAG.load(Ordering::Relaxed)
+                        {
+                            break 'outer_all_pairs;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_in_memory_recovery_session_lifecycle() {
+        let phrase =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ? ?"
+                .to_string();
+        let res = start_in_memory_session(phrase, None, "dual_word".to_string()).unwrap();
+        assert_eq!(res.status, "running");
+        assert_eq!(res.total_combinations, 4_194_304);
+
+        // Check live status
+        let status = get_live_session_status(&res.session_id).unwrap();
+        assert!(status.status == "running" || status.status == "completed");
+
+        // Test Pause
+        let pause_res = request_pause_session(&res.session_id).unwrap();
+        assert!(pause_res);
+
+        // Test Resume
+        let resume_res = request_resume_session(&res.session_id).unwrap();
+        assert!(resume_res);
+
+        // Test Cancel
+        let cancel_res = request_cancel_session(&res.session_id).unwrap();
+        assert!(cancel_res);
+    }
+}

@@ -1,8 +1,8 @@
-pub mod vault;
-pub mod security;
-pub mod wallets;
-pub mod scanner;
+pub mod archive;
 pub mod execution;
 pub mod network;
 pub mod notifications;
-pub mod archive;
+pub mod scanner;
+pub mod security;
+pub mod vault;
+pub mod wallets;

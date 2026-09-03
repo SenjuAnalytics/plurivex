@@ -30,6 +30,51 @@ export async function saveMasterPassword(token: string) {
   );
 }
 
+export async function savePinVault(pinToken: string, encryptedMasterPw: string) {
+  const database = await getDb();
+  await database.execute(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ($1, $2)",
+    ["pin_verification", pinToken],
+  );
+  await database.execute(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ($1, $2)",
+    ["pin_vault", encryptedMasterPw],
+  );
+}
+
+export async function getPinData(): Promise<{ pinToken: string; pinVault: string } | null> {
+  const database = await getDb();
+  const tokenRows = await database.select<{ value: string }[]>(
+    "SELECT value FROM meta WHERE key = 'pin_verification'",
+  );
+  const vaultRows = await database.select<{ value: string }[]>(
+    "SELECT value FROM meta WHERE key = 'pin_vault'",
+  );
+  if (tokenRows[0]?.value && vaultRows[0]?.value) {
+    return {
+      pinToken: tokenRows[0].value,
+      pinVault: vaultRows[0].value,
+    };
+  }
+  return null;
+}
+
+export async function resetEntireVault() {
+  const database = await getDb();
+  try {
+    await database.execute("DELETE FROM token_balances");
+  } catch {}
+  try {
+    await database.execute("DELETE FROM balances");
+  } catch {}
+  try {
+    await database.execute("DELETE FROM wallets");
+  } catch {}
+  try {
+    await database.execute("DELETE FROM meta");
+  } catch {}
+}
+
 export async function getVerificationToken(): Promise<string | null> {
   const database = await getDb();
   const rows = await database.select<{ value: string }[]>(

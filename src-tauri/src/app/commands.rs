@@ -1,15 +1,35 @@
 use crate::adapters::evm::client::*;
 use crate::adapters::solana::client::*;
-use crate::core::scanner::{execute_scan_balances, ScanSummary, CHAINS, ChainKind};
+use crate::core::scanner::{execute_scan_balances, ChainKind, ScanSummary, CHAINS};
 use crate::core::wallets::import::{scan_directory_native as core_scan_dir, NativeScanResult};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub static AIR_GAPPED_MODE: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn set_air_gapped_mode(enabled: bool) -> Result<bool, String> {
+    AIR_GAPPED_MODE.store(enabled, Ordering::SeqCst);
+    Ok(enabled)
+}
+
+#[tauri::command]
+pub fn get_air_gapped_mode() -> Result<bool, String> {
+    Ok(AIR_GAPPED_MODE.load(Ordering::SeqCst))
+}
 
 #[tauri::command]
 pub async fn rpc_get_balance(address: String, rpc: String) -> Result<String, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
     crate::adapters::evm::client::rpc_get_balance(&address, &rpc).await
 }
 
 #[tauri::command]
 pub async fn rpc_get_sol_balance(address: String, rpc: String) -> Result<String, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
     crate::adapters::solana::client::rpc_get_sol_balance(&address, &rpc).await
 }
 
@@ -19,12 +39,21 @@ pub async fn scan_balances(
     wallet_id: Option<i64>,
     wallet_ids: Option<Vec<i64>>,
 ) -> Result<ScanSummary, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
     execute_scan_balances(app, wallet_id, wallet_ids).await
 }
 
 #[tauri::command]
 pub async fn get_chain_fee_data(chain_key: String) -> Result<ChainFeeResponse, String> {
-    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == chain_key)
+        .ok_or_else(|| "Chain not found".to_string())?;
 
     if chain.kind == ChainKind::Solana {
         return Ok(ChainFeeResponse {
@@ -40,12 +69,23 @@ pub async fn get_chain_fee_data(chain_key: String) -> Result<ChainFeeResponse, S
 }
 
 #[tauri::command]
-pub async fn get_account_nonce_and_balance(chain_key: String, address: String) -> Result<AccountInfoResponse, String> {
-    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+pub async fn get_account_nonce_and_balance(
+    chain_key: String,
+    address: String,
+) -> Result<AccountInfoResponse, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == chain_key)
+        .ok_or_else(|| "Chain not found".to_string())?;
 
     if chain.kind == ChainKind::Solana {
         for rpc in chain.rpcs {
-            if let Ok(lamports_str) = crate::adapters::solana::client::rpc_get_sol_balance(&address, rpc).await {
+            if let Ok(lamports_str) =
+                crate::adapters::solana::client::rpc_get_sol_balance(&address, rpc).await
+            {
                 let lamports: u64 = lamports_str.parse().unwrap_or(0);
                 let sol_amt = (lamports as f64) / 1e9;
                 let formatted = format!("{:.6} SOL", sol_amt);
@@ -60,30 +100,60 @@ pub async fn get_account_nonce_and_balance(chain_key: String, address: String) -
         return Err("Failed to query Solana balance from all RPC nodes".to_string());
     }
 
-    crate::adapters::evm::client::get_account_nonce_and_balance(chain.key, chain.rpcs, chain.symbol, &address).await
+    crate::adapters::evm::client::get_account_nonce_and_balance(
+        chain.key,
+        chain.rpcs,
+        chain.symbol,
+        &address,
+    )
+    .await
 }
 
 #[tauri::command]
 pub async fn broadcast_raw_tx(chain_key: String, raw_tx: String) -> Result<String, String> {
-    let chain = CHAINS.iter().find(|c| c.key == chain_key).ok_or_else(|| "Chain not found".to_string())?;
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == chain_key)
+        .ok_or_else(|| "Chain not found".to_string())?;
     crate::adapters::evm::client::broadcast_raw_tx(chain.key, chain.rpcs, &raw_tx).await
 }
 
 #[tauri::command]
 pub async fn get_solana_recent_blockhash() -> Result<String, String> {
-    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == "sol")
+        .ok_or_else(|| "Solana chain not found".to_string())?;
     crate::adapters::solana::client::get_solana_recent_blockhash(chain.rpcs).await
 }
 
 #[tauri::command]
 pub async fn broadcast_solana_tx(raw_tx_base64: String) -> Result<String, String> {
-    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == "sol")
+        .ok_or_else(|| "Solana chain not found".to_string())?;
     crate::adapters::solana::client::broadcast_solana_tx(chain.rpcs, &raw_tx_base64).await
 }
 
 #[tauri::command]
 pub async fn get_solana_account_details(address: String) -> Result<SolanaAccountDetails, String> {
-    let chain = CHAINS.iter().find(|c| c.key == "sol").ok_or_else(|| "Solana chain not found".to_string())?;
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+    let chain = CHAINS
+        .iter()
+        .find(|c| c.key == "sol")
+        .ok_or_else(|| "Solana chain not found".to_string())?;
     crate::adapters::solana::client::get_solana_account_details(chain.rpcs, &address).await
 }
 
@@ -165,7 +235,9 @@ pub async fn vault_create_token(password: String) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn vault_verify_token(token: String, password: String) -> Result<bool, String> {
-    Ok(crate::core::security::crypto::verify_password(&token, &password))
+    Ok(crate::core::security::crypto::verify_password(
+        &token, &password,
+    ))
 }
 
 #[tauri::command]
@@ -181,12 +253,19 @@ pub async fn vault_derive_credentials_batch(
     secrets: Vec<String>,
     wallet_type: String,
 ) -> Result<Vec<Option<crate::core::wallets::derivation::DualCredentials>>, String> {
-    Ok(crate::core::wallets::derivation::derive_dual_credentials_batch_native(&secrets, &wallet_type))
+    Ok(
+        crate::core::wallets::derivation::derive_dual_credentials_batch_native(
+            &secrets,
+            &wallet_type,
+        ),
+    )
 }
 
 #[tauri::command]
 pub async fn vault_validate_mnemonic(phrase: String) -> Result<bool, String> {
-    Ok(crate::core::wallets::derivation::is_valid_mnemonic_phrase(&phrase))
+    Ok(crate::core::wallets::derivation::is_valid_mnemonic_phrase(
+        &phrase,
+    ))
 }
 
 #[tauri::command]
@@ -200,6 +279,154 @@ pub async fn vault_repair_mnemonic(
         target_address.as_deref(),
         missing_position,
     ))
+}
+
+#[tauri::command]
+pub async fn vault_extract_credentials(text: String) -> Result<Vec<String>, String> {
+    Ok(crate::core::wallets::extractor::extract_credentials_native(
+        &text,
+    ))
+}
+
+#[tauri::command]
+pub async fn start_recovery_session(
+    phrase: String,
+    target_address: Option<String>,
+    search_type: String,
+) -> Result<crate::core::wallets::recovery_session::RecoverySessionStatusResponse, String> {
+    crate::core::wallets::recovery_session::start_in_memory_session(
+        phrase,
+        target_address,
+        search_type,
+    )
+}
+
+#[tauri::command]
+pub async fn pause_recovery_session(session_id: String) -> Result<bool, String> {
+    crate::core::wallets::recovery_session::request_pause_session(&session_id)
+}
+
+#[tauri::command]
+pub async fn resume_recovery_session(session_id: String) -> Result<bool, String> {
+    crate::core::wallets::recovery_session::request_resume_session(&session_id)
+}
+
+#[tauri::command]
+pub async fn cancel_recovery_session(session_id: String) -> Result<bool, String> {
+    crate::core::wallets::recovery_session::request_cancel_session(&session_id)
+}
+
+#[tauri::command]
+pub async fn get_recovery_session_status(
+    session_id: String,
+) -> Result<crate::core::wallets::recovery_session::RecoverySessionStatusResponse, String> {
+    crate::core::wallets::recovery_session::get_live_session_status(&session_id)
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OnTheFlyBalanceResult {
+    pub phrase: String,
+    pub btc_address: Option<String>,
+    pub btc_balance: Option<String>,
+    pub evm_address: Option<String>,
+    pub evm_balances: std::collections::HashMap<String, String>,
+    pub sol_address: Option<String>,
+    pub sol_balance: Option<String>,
+    pub has_funds: bool,
+    pub total_usd_estimate: f64,
+}
+
+#[tauri::command]
+pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceResult, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
+    }
+
+    let creds = crate::core::wallets::derivation::derive_public_addresses_only_native(&phrase)?;
+    let client = crate::adapters::evm::client::shared_client();
+
+    let mut has_funds = false;
+    let mut total_usd = 0.0;
+
+    // 1. Scan Bitcoin if address present
+    let mut btc_balance_str: Option<String> = None;
+    if let Some(ref btc_addr) = creds.btc_address {
+        let btc_rpcs = &["https://mempool.space/api", "https://blockstream.info/api"];
+        if let Ok(res) =
+            crate::core::scanner::bitcoin::scan_bitcoin_for_wallet(&client, btc_addr, btc_rpcs, 0)
+                .await
+        {
+            if res.has_funds {
+                has_funds = true;
+                total_usd += 60000.0 * 0.001; // basic flag multiplier for non-zero satoshis
+            }
+            btc_balance_str = Some(res.native_balance);
+        }
+    }
+
+    // 2. Scan EVM across top chains (eth, bsc, base, arb)
+    let mut evm_map = std::collections::HashMap::new();
+    if let Some(ref evm_addr) = creds.evm_address {
+        for chain in CHAINS.iter().filter(|c| c.kind == ChainKind::Evm) {
+            for rpc in chain.rpcs.iter().take(2) {
+                if let Ok(hex_bal) =
+                    crate::adapters::evm::client::rpc_get_balance(evm_addr, rpc).await
+                {
+                    let (amt, display) = crate::adapters::evm::client::format_balance_display(
+                        &hex_bal,
+                        chain.symbol,
+                    );
+                    if amt > 0.0 {
+                        has_funds = true;
+                        let price = match chain.symbol {
+                            "ETH" => 2600.0,
+                            "BNB" => 580.0,
+                            _ => 1.0,
+                        };
+                        total_usd += amt * price;
+                    }
+                    evm_map.insert(chain.key.to_string(), display);
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Scan Solana
+    let mut sol_balance_str: Option<String> = None;
+    if let Some(ref sol_addr) = creds.sol_address {
+        let sol_chain = CHAINS.iter().find(|c| c.key == "sol");
+        if let Some(chain) = sol_chain {
+            for rpc in chain.rpcs.iter().take(2) {
+                if let Ok(lamports_str) =
+                    crate::adapters::solana::client::rpc_get_sol_balance(sol_addr, rpc).await
+                {
+                    let lamports: u64 = lamports_str.parse().unwrap_or(0);
+                    let (amt, display) =
+                        crate::adapters::solana::client::format_sol_display(lamports);
+                    if amt > 0.0 {
+                        has_funds = true;
+                        total_usd += amt * 145.0;
+                    }
+                    sol_balance_str = Some(display);
+                    break;
+                }
+            }
+        }
+    }
+
+    Ok(OnTheFlyBalanceResult {
+        phrase,
+        btc_address: creds.btc_address,
+        btc_balance: btc_balance_str,
+        evm_address: creds.evm_address,
+        evm_balances: evm_map,
+        sol_address: creds.sol_address,
+        sol_balance: sol_balance_str,
+        has_funds,
+        total_usd_estimate: (total_usd * 100.0).round() / 100.0,
+    })
 }
 
 #[cfg(test)]

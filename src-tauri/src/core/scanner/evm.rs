@@ -71,7 +71,9 @@ pub async fn scan_evm_for_wallet(
                             let token_idx = (id - 1) as usize;
                             if token_idx < tokens_to_scan.len() {
                                 let tok = &tokens_to_scan[token_idx];
-                                if let Some((amt, formatted)) = format_token_amount(hex_res, tok.decimals, tok.symbol) {
+                                if let Some((amt, formatted)) =
+                                    format_token_amount(hex_res, tok.decimals, tok.symbol)
+                                {
                                     if amt > 0.0 {
                                         has_funds = true;
                                         tokens.push(DiscoveredToken {

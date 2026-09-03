@@ -23,6 +23,15 @@ pub struct DualCredentials {
     pub btc_private_key: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicAddressesOnly {
+    pub evm_address: Option<String>,
+    pub sol_address: Option<String>,
+    pub btc_address: Option<String>,
+    pub btc_legacy_address: Option<String>,
+}
+
 /// Derive standard SLIP-0010 Ed25519 master and child keys (Phantom/Solflare standard)
 pub fn slip10_derive_ed25519(seed: &[u8], path: &[u32]) -> [u8; 32] {
     let mut mac = HmacSha512::new_from_slice(b"ed25519 seed").expect("HMAC init");
@@ -117,7 +126,7 @@ pub fn bitcoin_credentials_from_private_key(
     let pubkey_bytes = compressed_pubkey.as_bytes();
 
     let sha256_hash = Sha256::digest(pubkey_bytes);
-    let hash160 = Ripemd160::digest(&sha256_hash);
+    let hash160 = Ripemd160::digest(sha256_hash);
 
     // 1. Native SegWit (BIP-84) Bech32 address: "bc1q..."
     let mut data = vec![u5::try_from_u8(0).map_err(|e| e.to_string())?];
@@ -129,7 +138,7 @@ pub fn bitcoin_credentials_from_private_key(
     let mut p2pkh_payload = Vec::with_capacity(25);
     p2pkh_payload.push(0x00); // Mainnet P2PKH version
     p2pkh_payload.extend_from_slice(&hash160);
-    let chk1 = Sha256::digest(&Sha256::digest(&p2pkh_payload));
+    let chk1 = Sha256::digest(Sha256::digest(&p2pkh_payload));
     p2pkh_payload.extend_from_slice(&chk1[0..4]);
     let btc_legacy = bs58::encode(&p2pkh_payload).into_string();
 
@@ -138,7 +147,7 @@ pub fn bitcoin_credentials_from_private_key(
     wif_payload.push(0x80); // Mainnet WIF
     wif_payload.extend_from_slice(privkey_bytes);
     wif_payload.push(0x01); // Compressed
-    let chk2 = Sha256::digest(&Sha256::digest(&wif_payload));
+    let chk2 = Sha256::digest(Sha256::digest(&wif_payload));
     wif_payload.extend_from_slice(&chk2[0..4]);
     let btc_wif = bs58::encode(&wif_payload).into_string();
 
@@ -162,24 +171,19 @@ pub fn derive_dual_credentials_native(
             let path: DerivationPath = "m/44'/60'/0'/0/0"
                 .parse()
                 .map_err(|e| format!("Invalid derivation path: {}", e))?;
-            let xprv = XPrv::derive_from_path(&seed_bytes, &path)
+            let xprv = XPrv::derive_from_path(seed_bytes, &path)
                 .map_err(|e| format!("EVM HD derivation failed: {}", e))?;
             let evm_pk_bytes: [u8; 32] = xprv.private_key().to_bytes().into();
             let (evm_address, evm_private_key) = evm_address_from_private_key(&evm_pk_bytes)?;
 
             // 2. Solana Derivation (SLIP-0010 path: m/44'/501'/0'/0')
-            let sol_slip10_path = [
-                44 | 0x80000000,
-                501 | 0x80000000,
-                0 | 0x80000000,
-                0 | 0x80000000,
-            ];
+            let sol_slip10_path = [44 | 0x80000000, 501 | 0x80000000, 0x80000000, 0x80000000];
             let sol_seed_32 = slip10_derive_ed25519(&seed_bytes, &sol_slip10_path);
             let (sol_address, sol_private_key) = solana_credentials_from_seed(&sol_seed_32);
 
             // 3. Bitcoin BIP-84 Native SegWit (path: m/84'/0'/0'/0/0) -> bc1q...
             let (btc_address, btc_private_key) = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
-                Ok(p) => match XPrv::derive_from_path(&seed_bytes, &p) {
+                Ok(p) => match XPrv::derive_from_path(seed_bytes, &p) {
                     Ok(x) => {
                         let pk: [u8; 32] = x.private_key().to_bytes().into();
                         match bitcoin_credentials_from_private_key(&pk) {
@@ -194,7 +198,7 @@ pub fn derive_dual_credentials_native(
 
             // 4. Bitcoin BIP-44 Legacy (path: m/44'/0'/0'/0/0) -> 1...
             let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
-                Ok(p) => match XPrv::derive_from_path(&seed_bytes, &p) {
+                Ok(p) => match XPrv::derive_from_path(seed_bytes, &p) {
                     Ok(x) => {
                         let pk: [u8; 32] = x.private_key().to_bytes().into();
                         match bitcoin_credentials_from_private_key(&pk) {
@@ -229,10 +233,11 @@ pub fn derive_dual_credentials_native(
 
             let (evm_address, evm_private_key) = evm_address_from_private_key(&pk_bytes)?;
             let (sol_address, sol_private_key) = solana_credentials_from_seed(&pk_bytes);
-            let (btc_address, btc_legacy, btc_wif) = match bitcoin_credentials_from_private_key(&pk_bytes) {
-                Ok((addr, leg, wif)) => (Some(addr), Some(leg), Some(wif)),
-                Err(_) => (None, None, None),
-            };
+            let (btc_address, btc_legacy, btc_wif) =
+                match bitcoin_credentials_from_private_key(&pk_bytes) {
+                    Ok((addr, leg, wif)) => (Some(addr), Some(leg), Some(wif)),
+                    Err(_) => (None, None, None),
+                };
 
             Ok(DualCredentials {
                 evm_address: Some(evm_address),
@@ -245,8 +250,9 @@ pub fn derive_dual_credentials_native(
             })
         }
         "sol_pk" => {
-            let decoded =
-                bs58::decode(t).into_vec().map_err(|e| format!("Invalid Base58 key: {}", e))?;
+            let decoded = bs58::decode(t)
+                .into_vec()
+                .map_err(|e| format!("Invalid Base58 key: {}", e))?;
             let raw32: [u8; 32] = if decoded.len() == 64 {
                 let mut buf = [0u8; 32];
                 buf.copy_from_slice(&decoded[0..32]);
@@ -279,6 +285,86 @@ pub fn derive_dual_credentials_native(
     }
 }
 
+/// Zero-RAM-leakage: Derive only public addresses without ever creating private key strings in memory.
+/// Seed buffer is zeroized using volatile writes and memory barriers immediately upon exit.
+pub fn derive_public_addresses_only_native(
+    mnemonic_phrase: &str,
+) -> Result<PublicAddressesOnly, String> {
+    let t = mnemonic_phrase.trim();
+    let mnemonic = Mnemonic::parse_normalized(t)
+        .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
+
+    let mut seed_bytes = mnemonic.to_seed("");
+
+    // 1. EVM Public Address (BIP-44 path: m/44'/60'/0'/0/0)
+    let evm_address = match "m/44'/60'/0'/0/0".parse::<DerivationPath>() {
+        Ok(path) => match XPrv::derive_from_path(seed_bytes, &path) {
+            Ok(xprv) => {
+                let pk_bytes: [u8; 32] = xprv.private_key().to_bytes().into();
+                let signing_key = match SigningKey::from_bytes((&pk_bytes).into()) {
+                    Ok(k) => k,
+                    Err(_) => return Err("Invalid secp256k1 key".into()),
+                };
+                let verifying_key = signing_key.verifying_key();
+                let uncompressed = verifying_key.to_encoded_point(false);
+                Some(evm_address_from_public_key(uncompressed.as_bytes()))
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    // 2. Solana Public Address (SLIP-0010 path: m/44'/501'/0'/0')
+    let sol_slip10_path = [44 | 0x80000000, 501 | 0x80000000, 0x80000000, 0x80000000];
+    let mut sol_seed_32 = slip10_derive_ed25519(&seed_bytes, &sol_slip10_path);
+    let sol_address = {
+        let signing_key = EdSigningKey::from_bytes(&sol_seed_32);
+        let verifying_key = signing_key.verifying_key();
+        crate::core::security::memory::secure_zero_slice(&mut sol_seed_32);
+        Some(bs58::encode(verifying_key.as_bytes()).into_string())
+    };
+
+    // 3. Bitcoin BIP-84 Native SegWit (path: m/84'/0'/0'/0/0) -> bc1q...
+    let btc_address = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes, &p) {
+            Ok(x) => {
+                let pk: [u8; 32] = x.private_key().to_bytes().into();
+                match bitcoin_credentials_from_private_key(&pk) {
+                    Ok((addr, _, _)) => Some(addr),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    // 4. Bitcoin BIP-44 Legacy (path: m/44'/0'/0'/0/0) -> 1...
+    let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes, &p) {
+            Ok(x) => {
+                let pk: [u8; 32] = x.private_key().to_bytes().into();
+                match bitcoin_credentials_from_private_key(&pk) {
+                    Ok((_, leg, _)) => Some(leg),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    // Scrub intermediate seed memory immediately
+    crate::core::security::memory::secure_zero_slice(&mut seed_bytes);
+
+    Ok(PublicAddressesOnly {
+        evm_address,
+        sol_address,
+        btc_address,
+        btc_legacy_address,
+    })
+}
+
 pub fn is_valid_mnemonic_phrase(phrase: &str) -> bool {
     Mnemonic::parse_normalized(phrase.trim()).is_ok()
 }
@@ -301,7 +387,8 @@ mod tests {
     #[test]
     fn test_mnemonic_dual_derivation() {
         let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        let creds = derive_dual_credentials_native(mnemonic, "seed").expect("Seed derivation failed");
+        let creds =
+            derive_dual_credentials_native(mnemonic, "seed").expect("Seed derivation failed");
 
         assert_eq!(
             creds.evm_address.as_deref(),

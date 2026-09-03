@@ -6,7 +6,7 @@ import {
   countByType,
   formatBreadcrumb,
   processFilesStreaming,
-  smartNormalizeInput,
+  smartNormalizeInputNative,
   type FileScanReport,
   type ReadImportProgress,
 } from "../lib/extract";
@@ -248,7 +248,7 @@ export function ImportPanel({ floating = false, onClose }: ImportPanelProps) {
           await new Promise((r) => setTimeout(r, 0));
         }
 
-        const foundInFile = smartNormalizeInput(file.content);
+        const foundInFile = await smartNormalizeInputNative(file.content);
         for (const wallet of foundInFile) {
           const canon = canonicalKey(wallet);
           if (uniqueWallets.has(canon)) continue;

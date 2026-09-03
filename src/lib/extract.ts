@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import bs58 from "bs58";
 import { ethers } from "ethers";
 import { wordlists } from "@ethersproject/wordlists";
@@ -244,6 +245,18 @@ export function smartNormalizeInput(raw: string): string[] {
   const fromDeep = extractWalletsFromText(raw);
   const fromLines = normalizeInput(raw).filter(isValidWalletEntry);
   return dedupeWallets([...fromDeep, ...fromLines].filter(isValidWalletEntry));
+}
+
+export async function smartNormalizeInputNative(raw: string): Promise<string[]> {
+  try {
+    const extracted = await invoke<string[]>("vault_extract_credentials", { text: raw });
+    if (extracted && extracted.length > 0) {
+      return extracted;
+    }
+  } catch (err) {
+    console.warn("Native Rust extraction fallback to JS:", err);
+  }
+  return smartNormalizeInput(raw);
 }
 
 export function countByType(wallets: string[]) {
@@ -627,7 +640,7 @@ export async function processFilesStreaming(
 
     textReadCount++;
 
-    const foundInFile = smartNormalizeInput(text);
+    const foundInFile = await smartNormalizeInputNative(text);
 
     for (const wallet of foundInFile) {
       const canon = canonicalKey(wallet);

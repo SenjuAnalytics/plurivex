@@ -91,7 +91,11 @@ pub async fn rpc_get_balance(address: &str, rpc: &str) -> Result<String, String>
         .ok_or_else(|| "empty RPC result".to_string())
 }
 
-pub async fn get_chain_fee_data(chain_key: &str, rpcs: &[&str], symbol: &str) -> Result<ChainFeeResponse, String> {
+pub async fn get_chain_fee_data(
+    chain_key: &str,
+    rpcs: &[&str],
+    symbol: &str,
+) -> Result<ChainFeeResponse, String> {
     let client = shared_client();
     let chain_id = match chain_key {
         "eth" => 1,
@@ -156,7 +160,12 @@ pub async fn get_chain_fee_data(chain_key: &str, rpcs: &[&str], symbol: &str) ->
     })
 }
 
-pub async fn get_account_nonce_and_balance(chain_key: &str, rpcs: &[&str], symbol: &str, address: &str) -> Result<AccountInfoResponse, String> {
+pub async fn get_account_nonce_and_balance(
+    chain_key: &str,
+    rpcs: &[&str],
+    symbol: &str,
+    address: &str,
+) -> Result<AccountInfoResponse, String> {
     let client = shared_client();
     let batch = serde_json::json!([
         {
@@ -191,7 +200,8 @@ pub async fn get_account_nonce_and_balance(chain_key: &str, rpcs: &[&str], symbo
 
                         for item in arr {
                             let id = item.get("id").and_then(|i| i.as_u64()).unwrap_or(99);
-                            let res_str = item.get("result").and_then(|r| r.as_str()).unwrap_or("0x0");
+                            let res_str =
+                                item.get("result").and_then(|r| r.as_str()).unwrap_or("0x0");
                             if id == 0 {
                                 balance_hex = res_str.to_string();
                             } else if id == 1 {
@@ -214,10 +224,16 @@ pub async fn get_account_nonce_and_balance(chain_key: &str, rpcs: &[&str], symbo
         }
     }
 
-    Err(format!("Failed to query wallet data from all RPC nodes for chain {chain_key}"))
+    Err(format!(
+        "Failed to query wallet data from all RPC nodes for chain {chain_key}"
+    ))
 }
 
-pub async fn broadcast_raw_tx(chain_key: &str, rpcs: &[&str], raw_tx: &str) -> Result<String, String> {
+pub async fn broadcast_raw_tx(
+    chain_key: &str,
+    rpcs: &[&str],
+    raw_tx: &str,
+) -> Result<String, String> {
     let client = shared_client();
 
     for rpc in rpcs {
@@ -241,7 +257,10 @@ pub async fn broadcast_raw_tx(chain_key: &str, rpcs: &[&str], raw_tx: &str) -> R
                         return Ok(hash.to_string());
                     }
                     if let Some(err) = data.get("error") {
-                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("RPC Error");
+                        let msg = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("RPC Error");
                         return Err(msg.to_string());
                     }
                 }
@@ -249,5 +268,7 @@ pub async fn broadcast_raw_tx(chain_key: &str, rpcs: &[&str], raw_tx: &str) -> R
         }
     }
 
-    Err(format!("All RPC nodes failed to broadcast transaction for chain {chain_key}"))
+    Err(format!(
+        "All RPC nodes failed to broadcast transaction for chain {chain_key}"
+    ))
 }

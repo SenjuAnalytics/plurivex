@@ -6,7 +6,7 @@ commands.allow = ["rpc_get_balance", "rpc_get_sol_balance"]
 [[permission]]
 identifier = "allow-scan-balances"
 description = "Allow scanning and saving wallet balances"
-commands.allow = ["scan_balances"]
+commands.allow = ["scan_balances", "scan_phrase_on_the_fly"]
 
 [[permission]]
 identifier = "allow-fee-estimate"
@@ -59,3 +59,18 @@ commands.allow = [
   "vault_repair_mnemonic"
 ]
 
+[[permission]]
+identifier = "allow-air-gapped-controls"
+description = "Allow toggling and querying Air-Gapped Safe Mode status"
+commands.allow = ["set_air_gapped_mode", "get_air_gapped_mode"]
+
+[[permission]]
+identifier = "allow-recovery-session"
+description = "Allow running, pausing, resuming, and querying persistent recovery sessions"
+commands.allow = [
+  "start_recovery_session",
+  "pause_recovery_session",
+  "resume_recovery_session",
+  "cancel_recovery_session",
+  "get_recovery_session_status"
+]

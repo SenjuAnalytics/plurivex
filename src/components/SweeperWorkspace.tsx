@@ -313,7 +313,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                   <div className="gas-custom-inline">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.05"
                       min="0.001"
                       className="gas-custom-num mono"
                       value={customGwei}
@@ -328,6 +328,38 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
                       placeholder="Gwei"
                     />
                     <span className="gas-custom-lbl">G</span>
+                    <div className="gas-stepper-arrows">
+                      <button
+                        type="button"
+                        className="gas-arrow-btn"
+                        onClick={() => {
+                          const curr = parseFloat(customGwei) || 1;
+                          const next = Number((curr + 0.1).toFixed(2));
+                          setCustomGwei(String(next));
+                          setGasPriceGwei(next);
+                        }}
+                        title="Naikkan Gas (+0.1 Gwei)"
+                      >
+                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 15l-6-6-6 6"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="gas-arrow-btn"
+                        onClick={() => {
+                          const curr = parseFloat(customGwei) || 1;
+                          const next = Math.max(0.01, Number((curr - 0.1).toFixed(2)));
+                          setCustomGwei(String(next));
+                          setGasPriceGwei(next);
+                        }}
+                        title="Turunkan Gas (-0.1 Gwei)"
+                      >
+                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button

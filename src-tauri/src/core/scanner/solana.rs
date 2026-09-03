@@ -30,7 +30,10 @@ pub async fn scan_solana_for_wallet(
         if let Ok(res1) = post_native {
             if res1.status().is_success() {
                 if let Ok(data1) = res1.json::<serde_json::Value>().await {
-                    let lamports = data1.pointer("/result/value").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let lamports = data1
+                        .pointer("/result/value")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
                     let (sol_amt, display_str) = format_sol_display(lamports);
                     let mut has_funds = sol_amt > 0.0;
                     let mut tokens = Vec::new();
@@ -55,14 +58,31 @@ pub async fn scan_solana_for_wallet(
                     if let Ok(spl_response) = spl_res {
                         if spl_response.status().is_success() {
                             if let Ok(spl_data) = spl_response.json::<serde_json::Value>().await {
-                                if let Some(accounts) = spl_data.get("result").and_then(|r| r.get("value")).and_then(|v| v.as_array()) {
+                                if let Some(accounts) = spl_data
+                                    .get("result")
+                                    .and_then(|r| r.get("value"))
+                                    .and_then(|v| v.as_array())
+                                {
                                     for acc in accounts {
-                                        let info = acc.get("account").and_then(|a| a.get("data")).and_then(|d| d.get("parsed")).and_then(|p| p.get("info"));
-                                        let Some(info) = info else { continue; };
-                                        let mint = info.get("mint").and_then(|m| m.as_str()).unwrap_or("");
+                                        let info = acc
+                                            .get("account")
+                                            .and_then(|a| a.get("data"))
+                                            .and_then(|d| d.get("parsed"))
+                                            .and_then(|p| p.get("info"));
+                                        let Some(info) = info else {
+                                            continue;
+                                        };
+                                        let mint =
+                                            info.get("mint").and_then(|m| m.as_str()).unwrap_or("");
                                         let token_amount = info.get("tokenAmount");
-                                        let ui_amount = token_amount.and_then(|t| t.get("uiAmount")).and_then(|u| u.as_f64()).unwrap_or(0.0);
-                                        let amount_raw = token_amount.and_then(|t| t.get("amount")).and_then(|a| a.as_str()).unwrap_or("0");
+                                        let ui_amount = token_amount
+                                            .and_then(|t| t.get("uiAmount"))
+                                            .and_then(|u| u.as_f64())
+                                            .unwrap_or(0.0);
+                                        let amount_raw = token_amount
+                                            .and_then(|t| t.get("amount"))
+                                            .and_then(|a| a.as_str())
+                                            .unwrap_or("0");
 
                                         if ui_amount > 0.0 && !mint.is_empty() {
                                             has_funds = true;
@@ -71,7 +91,11 @@ pub async fn scan_solana_for_wallet(
                                                 known_sym.to_string()
                                             } else {
                                                 let start = &mint[..mint.len().min(4)];
-                                                let end = if mint.len() > 4 { &mint[mint.len() - 4..] } else { "" };
+                                                let end = if mint.len() > 4 {
+                                                    &mint[mint.len() - 4..]
+                                                } else {
+                                                    ""
+                                                };
                                                 format!("{start}..{end}")
                                             };
 

@@ -32,7 +32,16 @@ pub fn run() {
             app::commands::vault_derive_credentials,
             app::commands::vault_derive_credentials_batch,
             app::commands::vault_validate_mnemonic,
-            app::commands::vault_repair_mnemonic
+            app::commands::vault_repair_mnemonic,
+            app::commands::set_air_gapped_mode,
+            app::commands::get_air_gapped_mode,
+            app::commands::start_recovery_session,
+            app::commands::pause_recovery_session,
+            app::commands::resume_recovery_session,
+            app::commands::cancel_recovery_session,
+            app::commands::get_recovery_session_status,
+            app::commands::scan_phrase_on_the_fly,
+            app::commands::vault_extract_credentials
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

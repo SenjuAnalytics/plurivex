@@ -15,8 +15,8 @@ const IV_LEN: usize = 12;
 /// Derive 256-bit key using modern Argon2id
 pub fn derive_argon2id_key(password: &str, salt: &[u8]) -> Result<[u8; 32], String> {
     let mut key = [0u8; 32];
-    let params = Params::new(19456, 2, 1, Some(32))
-        .map_err(|e| format!("Argon2 params error: {}", e))?;
+    let params =
+        Params::new(19456, 2, 1, Some(32)).map_err(|e| format!("Argon2 params error: {}", e))?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     argon2
         .hash_password_into(password.as_bytes(), salt, &mut key)
@@ -193,7 +193,8 @@ mod tests {
         let legacy_b64 = BASE64.encode(legacy_packed);
 
         // Rust decrypt_vault must automatically detect legacy format and decrypt seamlessly!
-        let decrypted = decrypt_vault(&legacy_b64, password).expect("Legacy PBKDF2 decryption failed");
+        let decrypted =
+            decrypt_vault(&legacy_b64, password).expect("Legacy PBKDF2 decryption failed");
         assert_eq!(decrypted, secret);
     }
 }

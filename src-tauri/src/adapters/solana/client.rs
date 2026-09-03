@@ -83,7 +83,10 @@ pub async fn get_solana_recent_blockhash(rpcs: &[&str]) -> Result<String, String
         if let Ok(res) = resp {
             if res.status().is_success() {
                 if let Ok(data) = res.json::<serde_json::Value>().await {
-                    if let Some(bh) = data.pointer("/result/value/blockhash").and_then(|b| b.as_str()) {
+                    if let Some(bh) = data
+                        .pointer("/result/value/blockhash")
+                        .and_then(|b| b.as_str())
+                    {
                         return Ok(bh.to_string());
                     }
                 }
@@ -126,7 +129,10 @@ pub async fn broadcast_solana_tx(rpcs: &[&str], raw_tx_base64: &str) -> Result<S
                         return Ok(sig.to_string());
                     }
                     if let Some(err) = data.get("error") {
-                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Solana RPC Error");
+                        let msg = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Solana RPC Error");
                         last_err = msg.to_string();
                         if msg.contains("simulation failed") {
                             return Err(msg.to_string());
@@ -141,7 +147,10 @@ pub async fn broadcast_solana_tx(rpcs: &[&str], raw_tx_base64: &str) -> Result<S
     Err(last_err)
 }
 
-pub async fn get_solana_account_details(rpcs: &[&str], address: &str) -> Result<SolanaAccountDetails, String> {
+pub async fn get_solana_account_details(
+    rpcs: &[&str],
+    address: &str,
+) -> Result<SolanaAccountDetails, String> {
     let client = shared_client();
     let mut last_err = "Failed to query Solana account details from RPC nodes".to_string();
 
@@ -166,7 +175,10 @@ pub async fn get_solana_account_details(rpcs: &[&str], address: &str) -> Result<
             if res.status().is_success() {
                 if let Ok(data) = res.json::<serde_json::Value>().await {
                     if let Some(err) = data.get("error") {
-                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Solana RPC Error");
+                        let msg = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Solana RPC Error");
                         last_err = msg.to_string();
                         continue;
                     }
@@ -190,13 +202,26 @@ pub async fn get_solana_account_details(rpcs: &[&str], address: &str) -> Result<
                         }
 
                         if let Some(val_obj) = val {
-                            let owner = val_obj.get("owner").and_then(|o| o.as_str()).unwrap_or("11111111111111111111111111111111").to_string();
-                            let lamports = val_obj.get("lamports").and_then(|l| l.as_u64()).unwrap_or(0);
-                            let executable = val_obj.get("executable").and_then(|e| e.as_bool()).unwrap_or(false);
+                            let owner = val_obj
+                                .get("owner")
+                                .and_then(|o| o.as_str())
+                                .unwrap_or("11111111111111111111111111111111")
+                                .to_string();
+                            let lamports = val_obj
+                                .get("lamports")
+                                .and_then(|l| l.as_u64())
+                                .unwrap_or(0);
+                            let executable = val_obj
+                                .get("executable")
+                                .and_then(|e| e.as_bool())
+                                .unwrap_or(false);
                             let space = val_obj.get("space").and_then(|s| s.as_u64()).unwrap_or(0);
 
                             let parsed_data = val_obj.pointer("/data/parsed");
-                            let program_name = val_obj.pointer("/data/program").and_then(|p| p.as_str()).unwrap_or("");
+                            let program_name = val_obj
+                                .pointer("/data/program")
+                                .and_then(|p| p.as_str())
+                                .unwrap_or("");
 
                             let account_type;
                             let mut authority = None;
@@ -204,29 +229,60 @@ pub async fn get_solana_account_details(rpcs: &[&str], address: &str) -> Result<
                             let owner_label;
 
                             if owner == "11111111111111111111111111111111" {
-                                if program_name == "nonce" || (parsed_data.map_or(false, |p| p.get("type").and_then(|t| t.as_str()) == Some("initialized")) && space == 80) {
+                                if program_name == "nonce"
+                                    || (parsed_data.is_some_and(|p| {
+                                        p.get("type").and_then(|t| t.as_str())
+                                            == Some("initialized")
+                                    }) && space == 80)
+                                {
                                     account_type = "nonce_account".to_string();
-                                    authority = parsed_data.and_then(|p| p.pointer("/info/authority")).and_then(|a| a.as_str()).map(|s| s.to_string());
-                                    owner_label = "System Program (Durable Nonce Account)".to_string();
+                                    authority = parsed_data
+                                        .and_then(|p| p.pointer("/info/authority"))
+                                        .and_then(|a| a.as_str())
+                                        .map(|s| s.to_string());
+                                    owner_label =
+                                        "System Program (Durable Nonce Account)".to_string();
                                 } else {
                                     account_type = "standard_eoa".to_string();
-                                    owner_label = "System Program (Standard EOA Wallet)".to_string();
+                                    owner_label =
+                                        "System Program (Standard EOA Wallet)".to_string();
                                 }
-                            } else if owner == "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" || owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" {
+                            } else if owner == "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+                                || owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+                            {
                                 account_type = "token_account".to_string();
-                                authority = parsed_data.and_then(|p| p.pointer("/info/owner")).and_then(|o| o.as_str()).map(|s| s.to_string());
-                                token_mint = parsed_data.and_then(|p| p.pointer("/info/mint")).and_then(|m| m.as_str()).map(|s| s.to_string());
-                                let is_2022 = owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-                                owner_label = if is_2022 { "Token-2022 Program (Token Account ATA)".to_string() } else { "SPL Token Program (Token Account ATA)".to_string() };
+                                authority = parsed_data
+                                    .and_then(|p| p.pointer("/info/owner"))
+                                    .and_then(|o| o.as_str())
+                                    .map(|s| s.to_string());
+                                token_mint = parsed_data
+                                    .and_then(|p| p.pointer("/info/mint"))
+                                    .and_then(|m| m.as_str())
+                                    .map(|s| s.to_string());
+                                let is_2022 =
+                                    owner == "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+                                owner_label = if is_2022 {
+                                    "Token-2022 Program (Token Account ATA)".to_string()
+                                } else {
+                                    "SPL Token Program (Token Account ATA)".to_string()
+                                };
                             } else if owner == "Stake11111111111111111111111111111111111111" {
                                 account_type = "stake_account".to_string();
                                 owner_label = "Stake Program (Staking Account)".to_string();
                             } else {
                                 account_type = "custom_program".to_string();
-                                owner_label = format!("Custom Program ({})", if owner.len() > 8 { format!("{}…{}", &owner[..4], &owner[owner.len()-4..]) } else { owner.clone() });
+                                owner_label = format!(
+                                    "Custom Program ({})",
+                                    if owner.len() > 8 {
+                                        format!("{}…{}", &owner[..4], &owner[owner.len() - 4..])
+                                    } else {
+                                        owner.clone()
+                                    }
+                                );
                             }
 
-                            let is_sys = account_type == "standard_eoa" || account_type == "unallocated";
+                            let is_sys =
+                                account_type == "standard_eoa" || account_type == "unallocated";
 
                             return Ok(SolanaAccountDetails {
                                 exists: true,

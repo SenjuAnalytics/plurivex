@@ -43,6 +43,7 @@ plurix.db
 # User local test folders & media
 contohfile/
 gambar/
+mockup-ui/
 
 # Private Architecture & Internal Docs
 docs/

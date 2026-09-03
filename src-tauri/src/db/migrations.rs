@@ -68,5 +68,11 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: "ALTER TABLE wallets ADD COLUMN btc_address TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "drop_recovery_sessions_table",
+            sql: "DROP TABLE IF EXISTS recovery_sessions;",
+            kind: MigrationKind::Up,
+        },
     ]
 }

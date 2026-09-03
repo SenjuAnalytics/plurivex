@@ -1,7 +1,7 @@
-pub mod evm;
-pub mod solana;
 pub mod bitcoin;
+pub mod evm;
 pub mod pricing;
+pub mod solana;
 
 use futures::future::join_all;
 use rusqlite::{params, Connection};
@@ -57,10 +57,7 @@ pub struct ChainConfig {
 pub const CHAINS: &[ChainConfig] = &[
     ChainConfig {
         key: "btc",
-        rpcs: &[
-            "https://mempool.space/api",
-            "https://blockstream.info/api",
-        ],
+        rpcs: &["https://mempool.space/api", "https://blockstream.info/api"],
         symbol: "BTC",
         kind: ChainKind::Bitcoin,
         tokens: &[],
@@ -157,7 +154,9 @@ pub async fn execute_scan_balances(
         [],
     );
 
-    let wallets: Vec<(i64, Option<String>, Option<String>, Option<String>)> = if let Some(id) = wallet_id {
+    type WalletAddressTuple = (i64, Option<String>, Option<String>, Option<String>);
+
+    let wallets: Vec<WalletAddressTuple> = if let Some(id) = wallet_id {
         conn.query_row(
             "SELECT id, address, sol_address, btc_address FROM wallets WHERE id = ?1 AND (address IS NOT NULL OR sol_address IS NOT NULL OR btc_address IS NOT NULL)",
             params![id],
@@ -167,7 +166,11 @@ pub async fn execute_scan_balances(
         .map_err(|e| e.to_string())?
     } else if let Some(ids) = wallet_ids {
         if ids.is_empty() {
-            return Ok(ScanSummary { scanned: 0, funded: 0, errors: 0 });
+            return Ok(ScanSummary {
+                scanned: 0,
+                funded: 0,
+                errors: 0,
+            });
         }
         let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
@@ -175,7 +178,9 @@ pub async fn execute_scan_balances(
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(rusqlite::params_from_iter(ids.iter()), |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+            .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
             .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     } else {
@@ -183,7 +188,9 @@ pub async fn execute_scan_balances(
             .prepare("SELECT id, address, sol_address, btc_address FROM wallets WHERE address IS NOT NULL OR sol_address IS NOT NULL OR btc_address IS NOT NULL ORDER BY id")
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
             .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     };
@@ -191,7 +198,11 @@ pub async fn execute_scan_balances(
     drop(conn);
 
     if wallets.is_empty() {
-        return Ok(ScanSummary { scanned: 0, funded: 0, errors: 0 });
+        return Ok(ScanSummary {
+            scanned: 0,
+            funded: 0,
+            errors: 0,
+        });
     }
 
     let client = crate::adapters::evm::client::shared_client();
@@ -221,7 +232,16 @@ pub async fn execute_scan_balances(
                         Err("No bitcoin address".to_string())
                     }
                 } else if let Some(ref addr) = c_evm {
-                    evm::scan_evm_for_wallet(&c_client, addr, chain.key, chain.symbol, chain.rpcs, chain.tokens, w_id).await
+                    evm::scan_evm_for_wallet(
+                        &c_client,
+                        addr,
+                        chain.key,
+                        chain.symbol,
+                        chain.rpcs,
+                        chain.tokens,
+                        w_id,
+                    )
+                    .await
                 } else {
                     Err("No evm address".to_string())
                 }
@@ -269,7 +289,11 @@ pub async fn execute_scan_balances(
                     if w_res.has_funds {
                         funded_count += 1;
                     }
-                    let _ = update_stmt.execute(params![w_res.wallet_id, w_res.chain_key, w_res.native_balance]);
+                    let _ = update_stmt.execute(params![
+                        w_res.wallet_id,
+                        w_res.chain_key,
+                        w_res.native_balance
+                    ]);
 
                     for tok in w_res.tokens {
                         let _ = insert_tok_stmt.execute(params![

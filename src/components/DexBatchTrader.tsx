@@ -3,7 +3,7 @@ import { useApp } from "../context/AppContext";
 import { ChainIcon, IconTrendingUp, IconTrendingDown, IconTarget, IconZap } from "../icons";
 import type { WalletView } from "../lib/types";
 
-export function DexBatchTrader({ wallet: _wallet }: { wallet: WalletView }) {
+export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
   const { selectedSweepIds, toast } = useApp();
   const [selectedChain, setSelectedChain] = useState<"bsc" | "eth" | "base" | "arb" | "sol">("bsc");
   const [tokenAddress, setTokenAddress] = useState("");

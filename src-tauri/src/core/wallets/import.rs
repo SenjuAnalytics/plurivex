@@ -60,7 +60,7 @@ fn has_wallet_candidate(content: &str) -> bool {
     for &b in bytes {
         if is_b58_char(b) {
             consecutive_b58 += 1;
-            if consecutive_b58 >= 44 && consecutive_b58 <= 88 {
+            if (44..=88).contains(&consecutive_b58) {
                 return true;
             }
         } else {
@@ -77,7 +77,7 @@ fn has_wallet_candidate(content: &str) -> bool {
                     alpha_words += 1;
                 }
             }
-            if alpha_words >= 12 && alpha_words <= 28 {
+            if (12..=28).contains(&alpha_words) {
                 return true;
             }
         }
@@ -99,20 +99,17 @@ pub async fn scan_directory_native(path: String) -> Result<NativeScanResult, Str
             .unwrap_or("folder")
             .to_string();
 
-        let system_ignored_dirs: HashSet<&'static str> = [
-            "$recycle.bin",
-            "system volume information",
-        ]
-        .into_iter()
-        .collect();
+        let system_ignored_dirs: HashSet<&'static str> =
+            ["$recycle.bin", "system volume information"]
+                .into_iter()
+                .collect();
 
         let ignored_binary_exts: HashSet<&'static str> = [
-            "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "svg", "mp4", "mp3",
-            "wav", "avi", "mov", "mkv", "flac", "ogg", "zip", "rar", "7z", "tar", "gz",
-            "bz2", "xz", "iso", "exe", "dll", "sys", "so", "dylib", "bin", "msi", "deb",
-            "rpm", "apk", "dmg", "ttf", "woff", "woff2", "eot", "otf", "o", "obj", "lib",
-            "a", "rlib", "rmeta", "pdb", "class", "pyc", "sqlite3", "db", "pack", "idx",
-            "pak", "node", "wasm",
+            "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "svg", "mp4", "mp3", "wav", "avi",
+            "mov", "mkv", "flac", "ogg", "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso",
+            "exe", "dll", "sys", "so", "dylib", "bin", "msi", "deb", "rpm", "apk", "dmg", "ttf",
+            "woff", "woff2", "eot", "otf", "o", "obj", "lib", "a", "rlib", "rmeta", "pdb", "class",
+            "pyc", "sqlite3", "db", "pack", "idx", "pak", "node", "wasm",
         ]
         .into_iter()
         .collect();
