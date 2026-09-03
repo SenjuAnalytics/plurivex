@@ -1,4 +1,4 @@
-import { IconChartPie, IconZap, IconRefresh, IconHistory, IconScan } from "../../icons";
+import { IconChartPie, IconZap, IconRefresh, IconHistory, IconScan, IconTrash } from "../../icons";
 import type { WalletType } from "../../lib/types";
 
 export type DetailMode = "portfolio" | "sweeper" | "dex" | "explorer";
@@ -144,11 +144,12 @@ export function WalletHeader({
           <div className="hero-actions-toolbar">
             <button
               type="button"
-              className="btn-hero-action btn-hero-scan"
+              className={`btn-hero-action btn-hero-scan ${scanning ? "is-scanning" : ""}`}
               onClick={onScan}
               disabled={!hasScanTarget || scanning}
+              title="Rescan balances across all configured chains"
             >
-              <IconScan size={13} />
+              <IconScan size={13} className={scanning ? "spin-scan" : ""} />
               <span>{scanning ? "Scanning…" : "Rescan Wallet"}</span>
             </button>
             <button
@@ -157,7 +158,8 @@ export function WalletHeader({
               onClick={onDelete}
               title="Remove wallet from vault"
             >
-              Delete
+              <IconTrash size={13} />
+              <span>Delete</span>
             </button>
           </div>
         </div>
