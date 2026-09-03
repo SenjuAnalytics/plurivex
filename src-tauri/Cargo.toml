@@ -1,8 +1,8 @@
 [package]
 name = "wallet-inspector"
 version = "0.1.0"
-description = "Local wallet inspector desktop app"
-authors = ["shole"]
+description = "Plurivex - High-Performance Multi-Chain Security Vault & Recovery Suite"
+authors = ["Plurivex Labs"]
 edition = "2021"
 
 [lib]
