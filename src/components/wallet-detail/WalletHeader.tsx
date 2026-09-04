@@ -162,34 +162,61 @@ export function WalletHeader({
           </div>
         </div>
 
-        {/* Compact Valuation Bar with Live CoinGecko USD / IDR Switcher */}
+        {/* Compact Valuation Bar with Multi-Currency Selector & Live CoinGecko Oracle */}
         {totalUsd > 0 && (
           <div className="hero-valuation-strip">
             <div className="valuation-strip-left">
               <span className="val-strip-lbl">ESTIMATED NET ASSETS:</span>
-              <button
-                type="button"
+              <div
                 className="val-strip-val mono"
-                onClick={pricing.toggleCurrency}
-                title="Klik untuk beralih antara USD dan Rupiah (IDR)"
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text)",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: "12px",
-                  padding: 0,
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--text)",
                 }}
               >
                 <span>{valuation.primary}</span>
-                <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 500 }}>
-                  ({valuation.secondary})
-                </span>
-              </button>
+                {valuation.secondary && (
+                  <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 500 }}>
+                    ({valuation.secondary})
+                  </span>
+                )}
+              </div>
+
+              {/* Fiat Currency Selector Dropdown */}
+              <select
+                className="val-currency-select mono"
+                value={pricing.currency}
+                onChange={(e) => pricing.setCurrency(e.target.value)}
+                aria-label="Valuation currency selector"
+                title="Pilih mata uang kurs valuasi (Default: USD)"
+                style={{
+                  background: "var(--card-bg, #1a1b26)",
+                  color: "var(--accent, #7aa2f7)",
+                  border: "1px solid var(--border, #2f3549)",
+                  borderRadius: "4px",
+                  padding: "1px 6px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  outline: "none",
+                  marginLeft: "4px",
+                }}
+              >
+                {pricing.supportedCurrencies.map((c) => (
+                  <option
+                    key={c.code}
+                    value={c.code}
+                    style={{ background: "#1a1b26", color: "#c0caf5" }}
+                  >
+                    {c.code} ({c.symbol})
+                  </option>
+                ))}
+              </select>
+
               {pricing.priceReport && (
                 <span
                   className={`val-feed-badge ${pricing.priceReport.stale ? "stale" : "live"}`}

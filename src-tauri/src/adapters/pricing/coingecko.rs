@@ -18,7 +18,52 @@ pub fn parse_coingecko_json(json_val: &serde_json::Value) -> HashMap<String, Pri
         for (id, val) in obj {
             let usd = val.get("usd").and_then(|v| v.as_f64());
             let idr = val.get("idr").and_then(|v| v.as_f64());
-            map.insert(id.clone(), PriceQuote { usd, idr });
+            let eur = val.get("eur").and_then(|v| v.as_f64());
+            let gbp = val.get("gbp").and_then(|v| v.as_f64());
+            let jpy = val.get("jpy").and_then(|v| v.as_f64());
+            let cny = val.get("cny").and_then(|v| v.as_f64());
+            let cad = val.get("cad").and_then(|v| v.as_f64());
+            let aud = val.get("aud").and_then(|v| v.as_f64());
+            let chf = val.get("chf").and_then(|v| v.as_f64());
+            let sgd = val.get("sgd").and_then(|v| v.as_f64());
+            let inr = val.get("inr").and_then(|v| v.as_f64());
+            let krw = val.get("krw").and_then(|v| v.as_f64());
+            let brl = val.get("brl").and_then(|v| v.as_f64());
+
+            let mut extra = HashMap::new();
+            if let Some(inner_obj) = val.as_object() {
+                for (k, v) in inner_obj {
+                    match k.as_str() {
+                        "usd" | "idr" | "eur" | "gbp" | "jpy" | "cny" | "cad" | "aud" | "chf"
+                        | "sgd" | "inr" | "krw" | "brl" => {}
+                        _ => {
+                            if let Some(num) = v.as_f64() {
+                                extra.insert(k.clone(), num);
+                            }
+                        }
+                    }
+                }
+            }
+
+            map.insert(
+                id.clone(),
+                PriceQuote {
+                    usd,
+                    idr,
+                    eur,
+                    gbp,
+                    jpy,
+                    cny,
+                    cad,
+                    aud,
+                    chf,
+                    sgd,
+                    inr,
+                    krw,
+                    brl,
+                    extra,
+                },
+            );
         }
     }
     map
@@ -52,7 +97,7 @@ pub async fn get_cached_or_fetch_prices(
 
     let ids_param = ids.join(",");
     let url = format!(
-        "https://api.coingecko.com/api/v3/simple/price?ids={}&vs_currencies=usd,idr",
+        "https://api.coingecko.com/api/v3/simple/price?ids={}&vs_currencies=usd,idr,eur,gbp,jpy,cny,cad,aud,chf,sgd,inr,krw,brl",
         ids_param
     );
 
@@ -120,13 +165,18 @@ mod tests {
     #[test]
     fn test_parse_coingecko_json() {
         let sample = serde_json::json!({
-            "bitcoin": { "usd": 68420.5, "idr": 1094728000.0 },
-            "ethereum": { "usd": 2650.0, "idr": 42400000.0 }
+            "bitcoin": { "usd": 68420.5, "idr": 1094728000.0, "eur": 62500.0, "gbp": 53600.0 },
+            "ethereum": { "usd": 2650.0, "idr": 42400000.0, "jpy": 398000.0 }
         });
 
         let parsed = parse_coingecko_json(&sample);
         assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed.get("bitcoin").unwrap().usd, Some(68420.5));
-        assert_eq!(parsed.get("ethereum").unwrap().idr, Some(42400000.0));
+        let btc = parsed.get("bitcoin").unwrap();
+        assert_eq!(btc.usd, Some(68420.5));
+        assert_eq!(btc.eur, Some(62500.0));
+        assert_eq!(btc.gbp, Some(53600.0));
+        let eth = parsed.get("ethereum").unwrap();
+        assert_eq!(eth.idr, Some(42400000.0));
+        assert_eq!(eth.jpy, Some(398000.0));
     }
 }
