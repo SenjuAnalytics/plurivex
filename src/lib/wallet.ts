@@ -312,14 +312,6 @@ export function deriveDualCredentials(secret: string, type: WalletType): DualCre
   };
 }
 
-export function derivePrivateKeyFromSecret(secret: string, type: WalletType): string | null {
-  try {
-    const creds = deriveDualCredentials(secret, type);
-    return creds.evmPrivateKey ?? creds.solPrivateKey;
-  } catch {
-    return null;
-  }
-}
 
 export function shortAddr(a: string) {
   return a.slice(0, 6) + "…" + a.slice(-4);
@@ -357,28 +349,4 @@ export function walletHasScanTarget(wallet: {
   type: WalletType;
 }): boolean {
   return Boolean(wallet.address || wallet.solAddress);
-}
-
-export function maskSecret(secret: string, type: WalletType): string {
-  const t = secret.trim();
-  if (type === "pk" || type === "sol_pk") return t.slice(0, 8) + "…" + t.slice(-6);
-  const w = t.split(/\s+/);
-  if (w.length <= 4) return t;
-  return w.slice(0, 3).join(" ") + " … " + w.slice(-2).join(" ");
-}
-
-export function entryStatus(text: string) {
-  const type = classify(text);
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const hex = text.trim().replace(/^0x/i, "");
-
-  if (type === "seed") return { kind: "seed" as const, ok: true, status: `${words.length} words ✓` };
-  if (MNEMONIC_LENGTHS.includes(words.length)) {
-    return { kind: "invalid" as const, ok: false, status: `${words.length} words ✗` };
-  }
-  if (type === "sol_pk") return { kind: "sol_pk" as const, ok: true, status: "Solana ✓" };
-  if (type === "pk") return { kind: "pk" as const, ok: true, status: "64 hex ✓" };
-  if (type === "pk_bad_length") return { kind: "invalid" as const, ok: false, status: `${hex.length}/64 hex` };
-  if (words.length > 1) return { kind: "invalid" as const, ok: false, status: `${words.length} words ✗` };
-  return { kind: "invalid" as const, ok: false, status: "invalid format" };
 }

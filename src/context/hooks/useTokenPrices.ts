@@ -128,12 +128,11 @@ export function useTokenPrices() {
     switch (lower) {
       case "btc":
       case "bitcoin":
+      case "wbtc":
         return "bitcoin";
       case "eth":
       case "ethereum":
       case "weth":
-      case "base":
-      case "arb":
         return "ethereum";
       case "bnb":
       case "bsc":
@@ -142,6 +141,28 @@ export function useTokenPrices() {
       case "sol":
       case "solana":
         return "solana";
+      case "arb":
+      case "arbitrum":
+        return "arbitrum";
+      case "link":
+      case "chainlink":
+        return "chainlink";
+      case "uni":
+      case "uniswap":
+        return "uniswap";
+      case "cake":
+      case "pancakeswap-token":
+        return "pancakeswap-token";
+      case "aero":
+      case "aerodrome-finance":
+        return "aerodrome-finance";
+      case "gmx":
+        return "gmx";
+      case "shib":
+      case "shiba-inu":
+        return "shiba-inu";
+      case "pepe":
+        return "pepe";
       default:
         return lower;
     }
@@ -151,30 +172,54 @@ export function useTokenPrices() {
     (key: string): number => {
       const k = key.toLowerCase();
       // Stablecoins pinned to ~1.00 USD
-      if (k === "usdt" || k === "usdc" || k === "dai" || k === "busd" || k === "fdusd" || k === "pyusd") {
+      if (
+        k === "usdt" ||
+        k === "usdc" ||
+        k === "usdbc" ||
+        k === "dai" ||
+        k === "busd" ||
+        k === "fdusd" ||
+        k === "pyusd"
+      ) {
         return 1.0;
       }
 
-      if (!priceReport?.prices) {
-        // Safe baseline fallbacks if offline
-        if (k === "btc" || k === "bitcoin") return 65000;
-        if (k === "eth" || k === "ethereum" || k === "weth" || k === "base" || k === "arb") return 2600;
-        if (k === "bnb" || k === "bsc" || k === "binancecoin") return 580;
-        if (k === "sol" || k === "solana") return 140;
-        return 0;
-      }
-
       const id = normalizeKey(key);
-      const quoteUsd = priceReport.prices[id]?.usd;
-      if (typeof quoteUsd === "number") {
+      const quoteUsd = priceReport?.prices?.[id]?.usd;
+      if (typeof quoteUsd === "number" && quoteUsd > 0) {
         return quoteUsd;
       }
 
-      if (k === "btc" || k === "bitcoin") return 65000;
-      if (k === "eth" || k === "ethereum" || k === "weth" || k === "base" || k === "arb") return 2600;
-      if (k === "bnb" || k === "bsc" || k === "binancecoin") return 580;
-      if (k === "sol" || k === "solana") return 140;
-      return 0;
+      // Safe baseline fallbacks if offline or initial load
+      switch (id) {
+        case "bitcoin":
+          return 65000;
+        case "ethereum":
+          return 2600;
+        case "binancecoin":
+          return 580;
+        case "solana":
+          return 140;
+        case "arbitrum":
+          return 0.50;
+        case "chainlink":
+          return 12.0;
+        case "uniswap":
+          return 6.0;
+        case "pancakeswap-token":
+          return 1.80;
+        case "aerodrome-finance":
+          return 0.60;
+        case "gmx":
+          return 25.0;
+        case "shiba-inu":
+          return 0.000015;
+        case "pepe":
+          return 0.00001;
+        default:
+          if (k === "base") return priceReport?.prices?.["ethereum"]?.usd ?? 2600;
+          return 0;
+      }
     },
     [priceReport]
   );
@@ -247,21 +292,29 @@ export function useTokenPrices() {
         if (convertedAmount < 1) {
           convertedFormatted = `< ${activeInfo.symbol} 1`;
         } else {
-          convertedFormatted = `${activeInfo.symbol} ${Math.round(convertedAmount).toLocaleString(activeInfo.locale)}`;
+          // Standard comma ',' for thousands separator, avoiding confusing dots
+          convertedFormatted = `${activeInfo.symbol} ${Math.round(convertedAmount).toLocaleString("en-US")}`;
         }
       } else {
         if (convertedAmount < 0.01) {
           convertedFormatted = `< ${activeInfo.symbol}0.01`;
         } else {
-          convertedFormatted = `${activeInfo.symbol}${convertedAmount.toLocaleString(activeInfo.locale, {
+          // Comma ',' for thousands, dot '.' for decimal fractions
+          convertedFormatted = `${activeInfo.symbol}${convertedAmount.toLocaleString("en-US", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`;
         }
       }
 
+      // Avoid redundant text like "Rp 16,150,000 IDR"
+      const primary =
+        activeCode === "IDR"
+          ? convertedFormatted
+          : `${convertedFormatted} ${activeCode}`;
+
       return {
-        primary: `${convertedFormatted} ${activeCode}`,
+        primary,
         secondary: usdFormatted,
       };
     },

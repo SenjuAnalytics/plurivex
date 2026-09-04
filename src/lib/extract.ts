@@ -232,7 +232,7 @@ function dedupeWallets(items: string[]): string[] {
   return result;
 }
 
-export function extractWalletsFromText(raw: string): string[] {
+function extractWalletsFromText(raw: string): string[] {
   const splitHex = extractSplitHexKeys(raw);
   const splitSol = extractSplitSolanaKeys(raw);
   const pks = extractPrivateKeys(raw);
@@ -272,40 +272,7 @@ export function countByType(wallets: string[]) {
   return { seedCount, pkCount, solCount };
 }
 
-export function summarizeExtraction(raw: string) {
-  const wallets = smartNormalizeInput(raw);
-  const counts = countByType(wallets);
-  return { wallets, ...counts, total: wallets.length, skippedDuplicate: 0, foundTotal: wallets.length };
-}
 
-export async function summarizeExtractionFiltered(
-  raw: string,
-  existingFingerprints: Set<string>,
-) {
-  const found = smartNormalizeInput(raw);
-  const wallets: string[] = [];
-  const seen = new Set(existingFingerprints);
-  let skippedDuplicate = 0;
-
-  for (const wallet of found) {
-    const fp = await walletFingerprint(wallet);
-    if (seen.has(fp)) {
-      skippedDuplicate++;
-      continue;
-    }
-    seen.add(fp);
-    wallets.push(wallet);
-  }
-
-  const counts = countByType(wallets);
-  return {
-    wallets,
-    ...counts,
-    total: wallets.length,
-    skippedDuplicate,
-    foundTotal: found.length,
-  };
-}
 
 const BINARY_MIME = [
   /^image\//,
@@ -361,7 +328,7 @@ function hasFileExtension(name: string): boolean {
   return /^[a-z0-9]{1,12}$/i.test(base.slice(dot + 1));
 }
 
-export async function readTextFile(file: File): Promise<string | null> {
+async function readTextFile(file: File): Promise<string | null> {
   try {
     const text = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -377,7 +344,7 @@ export async function readTextFile(file: File): Promise<string | null> {
   }
 }
 
-export function looksLikeTextContent(text: string): boolean {
+function looksLikeTextContent(text: string): boolean {
   if (!text.trim()) return false;
   const sample = text.slice(0, 16384);
   if (sample.includes("\u0000")) return false;
@@ -391,7 +358,7 @@ export function looksLikeTextContent(text: string): boolean {
   return weird / Math.max(sample.length, 1) < 0.08;
 }
 
-export function isTextImportFile(file: File): boolean {
+function isTextImportFile(file: File): boolean {
   const name = file.name.trim();
   if (!name) return false;
 

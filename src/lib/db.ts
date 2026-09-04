@@ -83,32 +83,6 @@ export async function getVerificationToken(): Promise<string | null> {
   return rows[0]?.value ?? null;
 }
 
-export async function insertWallet(data: {
-  type: WalletType;
-  encryptedSecret: string;
-  fingerprint: string;
-  address: string | null;
-  solAddress?: string | null;
-  btcAddress?: string | null;
-  wordCount: number | null;
-}) {
-  const database = await getDb();
-  const result = await database.execute(
-    `INSERT INTO wallets (type, encrypted_secret, fingerprint, address, sol_address, btc_address, word_count, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      data.type,
-      data.encryptedSecret,
-      data.fingerprint,
-      data.address,
-      data.solAddress ?? null,
-      data.btcAddress ?? null,
-      data.wordCount,
-      new Date().toISOString(),
-    ],
-  );
-  return result.lastInsertId as number;
-}
 
 export async function insertWalletsBatch(
   items: {
@@ -256,14 +230,6 @@ export async function getAllWallets(): Promise<WalletRecord[]> {
   });
 }
 
-export async function saveBalance(walletId: number, chain: string, balance: string) {
-  const database = await getDb();
-  await database.execute(
-    `INSERT OR REPLACE INTO balances (wallet_id, chain, balance, updated_at)
-     VALUES ($1, $2, $3, $4)`,
-    [walletId, chain, balance, new Date().toISOString()],
-  );
-}
 
 export async function deleteWallet(id: number) {
   const database = await getDb();
@@ -325,18 +291,6 @@ export async function getExistingAddresses(): Promise<{
   return { evm, sol, btc };
 }
 
-export async function upgradeWalletToSeed(
-  id: number,
-  encryptedSecret: string,
-  fingerprint: string,
-  wordCount: number,
-) {
-  const database = await getDb();
-  await database.execute(
-    "UPDATE wallets SET type = 'seed', encrypted_secret = $1, fingerprint = $2, word_count = $3 WHERE id = $4",
-    [encryptedSecret, fingerprint, wordCount, id],
-  );
-}
 
 export async function updateWalletLabel(id: number, label: string | null) {
   const database = await getDb();

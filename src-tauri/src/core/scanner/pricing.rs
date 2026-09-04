@@ -66,10 +66,15 @@ impl PriceReport {
     pub fn normalize_asset_id(key: &str) -> String {
         let lower = key.to_lowercase();
         match lower.as_str() {
-            "btc" | "bitcoin" => "bitcoin".to_string(),
-            "eth" | "ethereum" => "ethereum".to_string(),
-            "bnb" | "binancecoin" => "binancecoin".to_string(),
+            "btc" | "bitcoin" | "wbtc" => "bitcoin".to_string(),
+            "eth" | "ethereum" | "weth" => "ethereum".to_string(),
+            "bnb" | "binancecoin" | "bsc" => "binancecoin".to_string(),
             "sol" | "solana" => "solana".to_string(),
+            "arb" | "arbitrum" => "arbitrum".to_string(),
+            "link" | "chainlink" => "chainlink".to_string(),
+            "uni" | "uniswap" => "uniswap".to_string(),
+            "cake" => "pancakeswap-token".to_string(),
+            "aero" => "aerodrome-finance".to_string(),
             _ => lower,
         }
     }
@@ -130,6 +135,20 @@ impl PriceReport {
                 cad: Some(191.0),
                 aud: Some(211.0),
                 sgd: Some(185.0),
+                ..Default::default()
+            },
+        );
+        prices.insert(
+            "arbitrum".to_string(),
+            PriceQuote {
+                usd: Some(0.50),
+                idr: Some(8_000.0),
+                eur: Some(0.46),
+                gbp: Some(0.39),
+                jpy: Some(75.0),
+                cad: Some(0.68),
+                aud: Some(0.75),
+                sgd: Some(0.66),
                 ..Default::default()
             },
         );

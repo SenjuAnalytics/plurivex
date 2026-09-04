@@ -261,8 +261,24 @@ export function PortfolioDirectory({ onOpenImport }: PortfolioDirectoryProps) {
                     if (balStr) {
                       const num = parseFloat(balStr);
                       if (Number.isFinite(num) && num > 0) {
-                        balanceItems.push(`${num.toFixed(4)} ${chain.toUpperCase()}`);
+                        const symbol =
+                          chain === "bsc"
+                            ? "BNB"
+                            : chain === "base" || chain === "arb"
+                            ? "ETH"
+                            : chain.toUpperCase();
+                        const displayAmt = num < 0.0001 ? "< 0.0001" : num.toFixed(4);
+                        balanceItems.push(`${displayAmt} ${symbol}`);
                       }
+                    }
+                  }
+                }
+                if (w.tokens) {
+                  for (const t of w.tokens) {
+                    const num = parseFloat(t.balance);
+                    if (Number.isFinite(num) && num > 0) {
+                      const displayAmt = num < 0.0001 ? "< 0.0001" : num.toFixed(4);
+                      balanceItems.push(`${displayAmt} ${t.symbol}`);
                     }
                   }
                 }

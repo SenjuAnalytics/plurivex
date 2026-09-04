@@ -178,7 +178,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     for (const c of walletChains) {
       const val = wallet.balances[c.key];
       const num = balanceAmount(val);
-      const usd = num * pricing.getUsd(c.key);
+      const usd = num * pricing.getUsd(c.symbol);
       sum += usd;
       if (usd > 0) {
         allocs.push({ chain: c.key, label: c.label, color: c.color, usd, pct: 0 });

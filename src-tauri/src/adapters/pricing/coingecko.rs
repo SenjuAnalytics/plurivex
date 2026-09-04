@@ -88,6 +88,12 @@ pub async fn get_cached_or_fetch_prices(
         "ethereum".to_string(),
         "binancecoin".to_string(),
         "solana".to_string(),
+        "arbitrum".to_string(),
+        "chainlink".to_string(),
+        "uniswap".to_string(),
+        "pancakeswap-token".to_string(),
+        "aerodrome-finance".to_string(),
+        "gmx".to_string(),
     ];
 
     let ids = match requested_ids {

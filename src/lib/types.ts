@@ -1,13 +1,6 @@
 export type WalletType = "seed" | "pk" | "sol_pk" | "invalid";
 
-export interface ChainBalance {
-  chain: string;
-  label: string;
-  symbol: string;
-  value: string | null;
-  loading?: boolean;
-  error?: boolean;
-}
+
 
 export interface TokenBalance {
   walletId: number;

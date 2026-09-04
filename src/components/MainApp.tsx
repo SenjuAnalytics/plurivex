@@ -52,7 +52,7 @@ export function MainApp() {
         const val = w.balances?.[c.key];
         const num = balanceAmount(val);
         if (num > 0) {
-          sum += num * pricing.getUsd(c.key);
+          sum += num * pricing.getUsd(c.symbol);
         }
       }
       if (w.tokens) {
@@ -313,36 +313,6 @@ export function MainApp() {
                             </option>
                           ))}
                         </select>
-                        {pricing.priceReport && (
-                          <span
-                            className={`val-feed-badge ${pricing.priceReport.stale ? "stale" : "live"}`}
-                            title={
-                              pricing.priceReport.stale
-                                ? "Menggunakan cache harga (offline/stale) — klik untuk memperbarui"
-                                : "Harga pasar live via CoinGecko Oracle — klik untuk memperbarui"
-                            }
-                            style={{
-                              fontSize: "9px",
-                              fontWeight: 700,
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              background: pricing.priceReport.stale
-                                ? "rgba(227, 179, 65, 0.12)"
-                                : "rgba(74, 222, 128, 0.12)",
-                              color: pricing.priceReport.stale ? "var(--warning)" : "var(--ok)",
-                              border: `1px solid ${
-                                pricing.priceReport.stale
-                                  ? "var(--warning-border)"
-                                  : "var(--ok-border)"
-                              }`,
-                              cursor: "pointer",
-                              userSelect: "none",
-                            }}
-                            onClick={pricing.refreshPrices}
-                          >
-                            {pricing.priceReport.stale ? "🟡 Cache" : "🟢 CoinGecko"}
-                          </span>
-                        )}
                       </div>
                     </div>
                     <div className="amount" style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>

@@ -34,10 +34,3 @@ export function IconX({ size = 16, className }: IconProps) {
   );
 }
 
-export function IconArrowUpLeft({ size = 16, className }: IconProps) {
-  return (
-    <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 17 7 7" /><path d="M7 17V7h10" />
-    </svg>
-  );
-}
