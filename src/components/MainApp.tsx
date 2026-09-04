@@ -12,6 +12,7 @@ import { ActivityWorkspace } from "./ActivityWorkspace";
 import { RepairWorkspace } from "./repair-workspace/RepairWorkspace";
 import { WindowControls } from "./WindowControls";
 import { IconWallet, IconLock, IconSeed, IconKey } from "../icons";
+import { balanceAmount, chainsForWallet } from "../lib/chains";
 
 export function MainApp() {
   const [activeNav, setActiveNav] = useState<string>("dashboard");
@@ -35,12 +36,40 @@ export function MainApp() {
     toggleAirGapped,
     search,
     setSearch,
+    pricing,
   } = useApp();
 
   const selected = wallets.find((w) => w.id === selectedId) ?? null;
   const seedCount = wallets.filter((w) => w.type === "seed").length;
   const evmPkCount = wallets.filter((w) => w.type === "pk").length;
   const solCount = wallets.filter((w) => w.type === "sol_pk").length;
+
+  const totalPortfolioUsd = useMemo(() => {
+    let sum = 0;
+    for (const w of wallets) {
+      const chains = chainsForWallet(w);
+      for (const c of chains) {
+        const val = w.balances?.[c.key];
+        const num = balanceAmount(val);
+        if (num > 0) {
+          sum += num * pricing.getUsd(c.key);
+        }
+      }
+      if (w.tokens) {
+        for (const t of w.tokens) {
+          const num = balanceAmount(t.balance);
+          if (num > 0) {
+            sum += num * pricing.getUsd(t.symbol);
+          }
+        }
+      }
+    }
+    return sum;
+  }, [wallets, pricing.priceReport, pricing.getUsd]);
+
+  const portfolioValuation = useMemo(() => {
+    return pricing.formatValuation(totalPortfolioUsd);
+  }, [totalPortfolioUsd, pricing.formatValuation]);
 
   const pageTitle = useMemo(() => {
     switch (activeNav) {
@@ -246,21 +275,89 @@ export function MainApp() {
                 {/* Hero Net Worth Card */}
                 <div className="hero">
                   <div>
-                    <div className="label">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6L9 17l-5-5"/>
-                      </svg>
-                      Total Saldo Terpantau
+                    <div className="label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                        <span>Total Saldo Terpantau</span>
+                      </div>
+
+                      {/* Live Currency Selector & Oracle Status */}
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <select
+                          className="val-currency-select mono"
+                          value={pricing.currency}
+                          onChange={(e) => pricing.setCurrency(e.target.value)}
+                          aria-label="Pilih mata uang valuasi"
+                          title="Pilih mata uang kurs valuasi (Default: USD)"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.08)",
+                            color: "var(--accent, #7aa2f7)",
+                            border: "1px solid var(--border, rgba(255, 255, 255, 0.12))",
+                            borderRadius: "4px",
+                            padding: "1px 6px",
+                            fontSize: "10.5px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            outline: "none",
+                          }}
+                        >
+                          {pricing.supportedCurrencies.map((c) => (
+                            <option
+                              key={c.code}
+                              value={c.code}
+                              style={{ background: "#1a1b26", color: "#c0caf5" }}
+                            >
+                              {c.code} ({c.symbol})
+                            </option>
+                          ))}
+                        </select>
+                        {pricing.priceReport && (
+                          <span
+                            className={`val-feed-badge ${pricing.priceReport.stale ? "stale" : "live"}`}
+                            title={
+                              pricing.priceReport.stale
+                                ? "Menggunakan cache harga (offline/stale) — klik untuk memperbarui"
+                                : "Harga pasar live via CoinGecko Oracle — klik untuk memperbarui"
+                            }
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              background: pricing.priceReport.stale
+                                ? "rgba(227, 179, 65, 0.12)"
+                                : "rgba(74, 222, 128, 0.12)",
+                              color: pricing.priceReport.stale ? "var(--warning)" : "var(--ok)",
+                              border: `1px solid ${
+                                pricing.priceReport.stale
+                                  ? "var(--warning-border)"
+                                  : "var(--ok-border)"
+                              }`,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                            onClick={pricing.refreshPrices}
+                          >
+                            {pricing.priceReport.stale ? "🟡 Cache" : "🟢 CoinGecko"}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="amount">
-                      {fundedCount > 0 ? `${fundedCount} Wallets Active` : "Rp 0"}{" "}
-                      <small>≈ {wallets.length} Dompet Terenkripsi</small>
+                    <div className="amount" style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
+                      <span>{portfolioValuation.primary}</span>
+                      {portfolioValuation.secondary && (
+                        <small style={{ fontSize: "14px", color: "var(--text-dim)", fontWeight: 500 }}>
+                          ({portfolioValuation.secondary})
+                        </small>
+                      )}
                     </div>
                     <div className="delta">
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M18 15l-6-6-6 6"/>
                       </svg>
-                      {fundedCount} dompet memiliki saldo live
+                      {fundedCount} dari {wallets.length} dompet memiliki saldo aktif
                     </div>
                     <div className="actions">
                       <button

@@ -149,17 +149,32 @@ export function useTokenPrices() {
 
   const getUsd = useCallback(
     (key: string): number => {
+      const k = key.toLowerCase();
+      // Stablecoins pinned to ~1.00 USD
+      if (k === "usdt" || k === "usdc" || k === "dai" || k === "busd" || k === "fdusd" || k === "pyusd") {
+        return 1.0;
+      }
+
       if (!priceReport?.prices) {
         // Safe baseline fallbacks if offline
-        const k = key.toLowerCase();
         if (k === "btc" || k === "bitcoin") return 65000;
         if (k === "eth" || k === "ethereum" || k === "weth" || k === "base" || k === "arb") return 2600;
         if (k === "bnb" || k === "bsc" || k === "binancecoin") return 580;
         if (k === "sol" || k === "solana") return 140;
-        return 1.0;
+        return 0;
       }
+
       const id = normalizeKey(key);
-      return priceReport.prices[id]?.usd ?? (key.toLowerCase() === "btc" ? 65000 : 1.0);
+      const quoteUsd = priceReport.prices[id]?.usd;
+      if (typeof quoteUsd === "number") {
+        return quoteUsd;
+      }
+
+      if (k === "btc" || k === "bitcoin") return 65000;
+      if (k === "eth" || k === "ethereum" || k === "weth" || k === "base" || k === "arb") return 2600;
+      if (k === "bnb" || k === "bsc" || k === "binancecoin") return 580;
+      if (k === "sol" || k === "solana") return 140;
+      return 0;
     },
     [priceReport]
   );
