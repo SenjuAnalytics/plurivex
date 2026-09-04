@@ -338,6 +338,16 @@ pub struct OnTheFlyBalanceResult {
 }
 
 #[tauri::command]
+pub async fn get_token_prices(
+    ids: Option<Vec<String>>,
+) -> Result<crate::core::scanner::pricing::PriceReport, String> {
+    if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
+        return Err("Air-Gapped Safe Mode is ACTIVE: Price feeds blocked.".to_string());
+    }
+    crate::adapters::pricing::coingecko::get_cached_or_fetch_prices(ids).await
+}
+
+#[tauri::command]
 pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceResult, String> {
     if AIR_GAPPED_MODE.load(Ordering::SeqCst) {
         return Err("Air-Gapped Safe Mode is ACTIVE: Outbound network blocked.".to_string());
@@ -345,6 +355,15 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
 
     let creds = crate::core::wallets::derivation::derive_public_addresses_only_native(&phrase)?;
     let client = crate::adapters::evm::client::shared_client();
+
+    // Fetch dynamic live/cached prices with fallback
+    let price_report = crate::adapters::pricing::coingecko::get_cached_or_fetch_prices(None)
+        .await
+        .unwrap_or_else(|_| crate::core::scanner::pricing::PriceReport::baseline_fallback());
+    let btc_price = price_report.get_usd_price("btc").unwrap_or(65000.0);
+    let eth_price = price_report.get_usd_price("eth").unwrap_or(2600.0);
+    let bnb_price = price_report.get_usd_price("bnb").unwrap_or(580.0);
+    let sol_price = price_report.get_usd_price("sol").unwrap_or(140.0);
 
     let mut has_funds = false;
     let mut total_usd = 0.0;
@@ -359,7 +378,8 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
         {
             if res.has_funds {
                 has_funds = true;
-                total_usd += 60000.0 * 0.001; // basic flag multiplier for non-zero satoshis
+                let parsed_btc = res.native_balance.parse::<f64>().unwrap_or(0.001);
+                total_usd += (parsed_btc * btc_price).max(0.01);
             }
             btc_balance_str = Some(res.native_balance);
         }
@@ -380,8 +400,8 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
                     if amt > 0.0 {
                         has_funds = true;
                         let price = match chain.symbol {
-                            "ETH" => 2600.0,
-                            "BNB" => 580.0,
+                            "ETH" => eth_price,
+                            "BNB" => bnb_price,
                             _ => 1.0,
                         };
                         total_usd += amt * price;
@@ -407,7 +427,7 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
                         crate::adapters::solana::client::format_sol_display(lamports);
                     if amt > 0.0 {
                         has_funds = true;
-                        total_usd += amt * 145.0;
+                        total_usd += amt * sol_price;
                     }
                     sol_balance_str = Some(display);
                     break;
@@ -432,6 +452,7 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
 #[cfg(test)]
 mod tests {
     #[test]
+    #[cfg(target_os = "windows")]
     fn test_windows_empty_clipboard() {
         use std::ffi::c_void;
         #[link(name = "user32")]

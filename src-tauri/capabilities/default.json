@@ -21,6 +21,7 @@
     "allow-vault-crypto",
     "allow-vault-derivation",
     "allow-air-gapped-controls",
-    "allow-recovery-session"
+    "allow-recovery-session",
+    "allow-price-feed"
   ]
 }

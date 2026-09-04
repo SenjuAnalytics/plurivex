@@ -74,3 +74,9 @@ commands.allow = [
   "cancel_recovery_session",
   "get_recovery_session_status"
 ]
+
+[[permission]]
+identifier = "allow-price-feed"
+description = "Allow fetching live multi-currency token prices from oracle feed"
+commands.allow = ["get_token_prices"]
+
