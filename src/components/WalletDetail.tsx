@@ -14,7 +14,7 @@ import { BalancePortfolioView } from "./wallet-detail/BalancePortfolioView";
 import type { SolanaAccountDetails } from "./wallet-detail/SolanaDiagnosticCard";
 
 export function WalletDetail({ wallet }: { wallet: WalletView }) {
-  const { removeWallet, revealSecret, scanOne, toast, setWalletLabel } = useApp();
+  const { removeWallet, revealSecret, scanOne, toast, setWalletLabel, pricing } = useApp();
   const [activeTab, setActiveTab] = useState<DetailMode>("portfolio");
   const [revealed, setRevealed] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
@@ -172,20 +172,13 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
   };
 
   const { totalUsd, allocations } = useMemo(() => {
-    const prices: Record<string, number> = {
-      eth: 2650,
-      bsc: 580,
-      base: 2650,
-      arb: 2650,
-      sol: 145,
-    };
     let sum = 0;
     const allocs: { chain: string; label: string; color: string; usd: number; pct: number }[] = [];
 
     for (const c of walletChains) {
       const val = wallet.balances[c.key];
       const num = balanceAmount(val);
-      const usd = num * (prices[c.key] || 1);
+      const usd = num * pricing.getUsd(c.key);
       sum += usd;
       if (usd > 0) {
         allocs.push({ chain: c.key, label: c.label, color: c.color, usd, pct: 0 });
@@ -195,7 +188,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     if (wallet.tokens) {
       for (const t of wallet.tokens) {
         const num = balanceAmount(t.balance);
-        const usd = num * (t.symbol === "WETH" ? 2650 : t.symbol === "ARB" ? 0.55 : 1);
+        const usd = num * pricing.getUsd(t.symbol);
         sum += usd;
         if (usd > 0) {
           allocs.push({ chain: t.chain, label: t.symbol, color: "#28a0f0", usd, pct: 0 });
@@ -210,7 +203,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     }
 
     return { totalUsd: sum, allocations: allocs };
-  }, [wallet, walletChains]);
+  }, [wallet, walletChains, pricing.priceReport, pricing.getUsd]);
 
   return (
     <div className={`detail-card${wallet.hasFunds ? " has-funds" : ""}`}>

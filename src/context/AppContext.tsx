@@ -5,6 +5,7 @@ import { useWalletFilters } from "./hooks/useWalletFilters";
 import { useWalletOperations, type ExportOptions } from "./hooks/useWalletOperations";
 import { useWalletScanner } from "./hooks/useWalletScanner";
 import { useAuthVault, type Screen } from "./hooks/useAuthVault";
+import { useTokenPrices } from "./hooks/useTokenPrices";
 import { decrypt } from "../lib/crypto";
 import { deriveDualCredentials } from "../lib/wallet";
 import { updateWalletAddresses } from "../lib/db";
@@ -60,12 +61,14 @@ interface AppContextValue {
   toasts: ToastMessage[];
   filteredWallets: WalletView[];
   fundedCount: number;
+  pricing: ReturnType<typeof useTokenPrices>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { toasts, toast } = useToastState();
+  const pricing = useTokenPrices();
 
   // 1. Core Wallet State & Operations Hook
   const walletOps = useWalletOperations({
@@ -203,6 +206,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toasts,
     filteredWallets: filters.filteredWallets,
     fundedCount: filters.fundedCount,
+    pricing,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

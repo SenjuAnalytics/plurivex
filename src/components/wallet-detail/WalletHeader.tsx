@@ -1,4 +1,5 @@
 import { IconChartPie, IconZap, IconRefresh, IconHistory, IconScan, IconTrash } from "../../icons";
+import { useApp } from "../../context/AppContext";
 import type { WalletType } from "../../lib/types";
 
 export type DetailMode = "portfolio" | "sweeper" | "dex" | "explorer";
@@ -50,6 +51,9 @@ export function WalletHeader({
   totalUsd,
   allocations,
 }: WalletHeaderProps) {
+  const { pricing } = useApp();
+  const valuation = pricing.formatValuation(totalUsd);
+
   return (
     <>
       {/* 1. Multi-Mode Workspace Header Tabs */}
@@ -66,46 +70,40 @@ export function WalletHeader({
           className={`workspace-tab ${activeTab === "sweeper" ? "active" : ""}`}
           onClick={() => setActiveTab("sweeper")}
         >
-          <IconZap size={13} /> Fund Sweeper
+          <IconZap size={13} /> Batch Sweeper
         </button>
         <button
           type="button"
           className={`workspace-tab ${activeTab === "dex" ? "active" : ""}`}
           onClick={() => setActiveTab("dex")}
         >
-          <IconRefresh size={13} /> DEX Batch Trader
+          <IconRefresh size={13} /> Quick DEX Swap
         </button>
         <button
           type="button"
           className={`workspace-tab ${activeTab === "explorer" ? "active" : ""}`}
           onClick={() => setActiveTab("explorer")}
         >
-          <IconHistory size={13} /> Explorer Hub
+          <IconHistory size={13} /> Explorer & Diagnostics
         </button>
       </div>
 
-      {/* 2. Symmetrical Executive Identity & Security Card */}
+      {/* 2. Executive Hero Identity & Balance Overview */}
       <div className="hero-executive-card">
         <div className="hero-top-row">
           <div className="hero-tags-group">
-            <span className="hero-type-badge">
-              {walletType === "seed"
-                ? "TRI-CHAIN BIP-39 SEED"
-                : walletType === "pk"
-                  ? "MULTI-CHAIN KEY"
-                  : "SOLANA KEY"}
-            </span>
-            {hasFunds && <span className="hero-funded-pill">Funded Asset</span>}
+            <span className={`hero-type-badge badge-${walletType.toLowerCase()}`}>{walletType}</span>
+            {hasFunds && <span className="hero-funded-pill">● HAS BALANCE</span>}
 
-            {/* Folder / Label Tag Manager */}
+            {/* Editable Label Tag */}
             <div className="detail-tag-cluster">
               {isEditingTag ? (
                 <div className="tag-inline-form">
                   <input
                     type="text"
-                    className="tag-input-sm mono"
-                    value={tagInput}
+                    className="input-base tag-input-sm"
                     placeholder="Tag name…"
+                    value={tagInput}
                     autoFocus
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -164,14 +162,65 @@ export function WalletHeader({
           </div>
         </div>
 
-        {/* Compact Valuation Bar (Only if positive assets exist) */}
+        {/* Compact Valuation Bar with Live CoinGecko USD / IDR Switcher */}
         {totalUsd > 0 && (
           <div className="hero-valuation-strip">
             <div className="valuation-strip-left">
               <span className="val-strip-lbl">ESTIMATED NET ASSETS:</span>
-              <span className="val-strip-val mono">
-                ${totalUsd < 0.01 ? "< 0.01" : totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-              </span>
+              <button
+                type="button"
+                className="val-strip-val mono"
+                onClick={pricing.toggleCurrency}
+                title="Klik untuk beralih antara USD dan Rupiah (IDR)"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "12px",
+                  padding: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>{valuation.primary}</span>
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 500 }}>
+                  ({valuation.secondary})
+                </span>
+              </button>
+              {pricing.priceReport && (
+                <span
+                  className={`val-feed-badge ${pricing.priceReport.stale ? "stale" : "live"}`}
+                  title={
+                    pricing.priceReport.stale
+                      ? "Menggunakan cache harga (offline/stale) — klik untuk memperbarui"
+                      : "Harga pasar live via CoinGecko Oracle — klik untuk memperbarui"
+                  }
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    background: pricing.priceReport.stale
+                      ? "rgba(227, 179, 65, 0.12)"
+                      : "rgba(74, 222, 128, 0.12)",
+                    color: pricing.priceReport.stale ? "var(--warning)" : "var(--ok)",
+                    border: `1px solid ${
+                      pricing.priceReport.stale
+                        ? "var(--warning-border)"
+                        : "var(--ok-border)"
+                    }`,
+                    marginLeft: "6px",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                  onClick={pricing.refreshPrices}
+                >
+                  {pricing.priceReport.stale ? "🟡 Cache" : "🟢 CoinGecko Live"}
+                </span>
+              )}
             </div>
             <div className="valuation-strip-right">
               {allocations.map((a) => (
