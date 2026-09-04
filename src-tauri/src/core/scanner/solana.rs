@@ -99,14 +99,14 @@ pub async fn scan_solana_for_wallet(
                                                 format!("{start}..{end}")
                                             };
 
-                                            let formatted = if ui_amount < 0.0001 {
-                                                format!("{ui_amount:.8} {symbol}")
+                                            let formatted: String = if ui_amount < 0.0001 {
+                                                format!("{:.8} {}", ui_amount, symbol)
                                             } else if ui_amount < 1.0 {
-                                                format!("{ui_amount:.6} {symbol}")
+                                                format!("{:.6} {}", ui_amount, symbol)
                                             } else if ui_amount < 1000.0 {
-                                                format!("{ui_amount:.4} {symbol}")
+                                                format!("{:.4} {}", ui_amount, symbol)
                                             } else {
-                                                format!("{ui_amount:.2} {symbol}")
+                                                format!("{:.2} {}", ui_amount, symbol)
                                             };
 
                                             tokens.push(DiscoveredToken {

@@ -29,12 +29,12 @@ pub fn format_sol_display(lamports: u64) -> (f64, String) {
     if amount == 0.0 {
         return (0.0, "0 SOL".to_string());
     }
-    let s = if amount < 0.00001 {
-        format!("{amount:.9} SOL")
+    let s: String = if amount < 0.00001 {
+        format!("{:.9} SOL", amount)
     } else if amount < 1.0 {
-        format!("{amount:.6} SOL")
+        format!("{:.6} SOL", amount)
     } else {
-        format!("{amount:.5} SOL")
+        format!("{:.5} SOL", amount)
     };
     (amount, s)
 }

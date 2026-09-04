@@ -31,14 +31,14 @@ pub fn format_balance_display(wei_hex: &str, symbol: &str) -> (f64, String) {
     let wei = u128::from_str_radix(clean, 16).unwrap_or(0);
     let amount = wei as f64 / 1e18;
     if amount == 0.0 {
-        return (0.0, format!("0 {symbol}"));
+        return (0.0, format!("0 {}", symbol));
     }
-    let s = if amount < 0.00001 {
-        format!("{amount:.18} {symbol}")
+    let s: String = if amount < 0.00001 {
+        format!("{:.18} {}", amount, symbol)
     } else if amount < 1.0 {
-        format!("{amount:.6} {symbol}")
+        format!("{:.6} {}", amount, symbol)
     } else {
-        format!("{amount:.5} {symbol}")
+        format!("{:.5} {}", amount, symbol)
     };
     (amount, s)
 }
@@ -57,14 +57,14 @@ pub fn format_token_amount(hex_val: &str, decimals: u8, symbol: &str) -> Option<
     if amount <= 0.0 {
         return None;
     }
-    let formatted = if amount < 0.0001 {
-        format!("{amount:.8} {symbol}")
+    let formatted: String = if amount < 0.0001 {
+        format!("{:.8} {}", amount, symbol)
     } else if amount < 1.0 {
-        format!("{amount:.6} {symbol}")
+        format!("{:.6} {}", amount, symbol)
     } else if amount < 1000.0 {
-        format!("{amount:.4} {symbol}")
+        format!("{:.4} {}", amount, symbol)
     } else {
-        format!("{amount:.2} {symbol}")
+        format!("{:.2} {}", amount, symbol)
     };
     Some((amount, formatted))
 }
