@@ -30,7 +30,7 @@ Aplikasi ini menggabungkan manajemen identitas kunci multi-chain (EVM, Solana, d
 - **10 Kamus Resmi BIP-39**: Mendukung Bahasa Inggris, Spanyol, Prancis, Italia, Portugis, Ceko, Jepang, Korea, Mandarin Tradisional, dan Mandarin Sederhana dengan *Auto-Language Detection*.
 - **Transposition Unscrambler**: Mendeteksi dan memulihkan kata-kata yang posisinya tertukar (*swapped adjacent or arbitrary words*) secara otomatis.
 - **Forensic Target Address Matcher**: Menemukan seed phrase yang tepat secara instan jika pengguna menyertakan alamat publik tujuan (EVM, Solana, atau Bitcoin).
-- **Live On-The-Fly Balance Scanner**: Memeriksa saldo on-chain langsung di RAM selama pencarian berlangsung tanpa mengotori database dengan dompet kosong. Menyajikan *Jackpot Celebration Chime* (Web Audio API) saat dompet bersaldo ditemukan.
+- **Live On-The-Fly Balance Scanner & Jackpot Guardrail**: Memeriksa saldo on-chain langsung di RAM selama pencarian berlangsung tanpa mengotori database dengan dompet kosong. Menyajikan *Jackpot Celebration Chime* (Web Audio API) saat dompet bersaldo ditemukan, dilengkapi **Interactive Confirmation Guardrail** untuk mencegah *silent auto-import*—pengguna dapat memilih *"Simpan ke Vault"*, *"Simpan & Sweep"*, atau *"Salin Saja"* sebelum data ditulis ke database lokal.
 - **Kontrol Sesi Real-Time**: Kontrol penuh untuk **Start**, **Pause**, **Resume**, dan **Cancel** sesi pemulihan dengan *ETA countdown* dan indikator kecepatan *combinations/second*.
 
 ### 3. 🛡️ Keamanan & Privasi Tingkat Tinggi
@@ -40,9 +40,11 @@ Aplikasi ini menggabungkan manajemen identitas kunci multi-chain (EVM, Solana, d
 - **Native OS Clipboard Auto-Clear**: Timer native Windows level User32 yang menghapus clipboard secara otomatis setelah 30 detik, bahkan jika jendela aplikasi diminimalkan atau tidak fokus.
 - **Memori Aman (*Zeroize*)**: Buffer sensitif dibersihkan (*securely zeroed*) dari RAM setelah selesai digunakan.
 
-### 4. 📊 Pemindai Saldo Multi-Chain & Token Discovery
-- Pemindaian saldo native paralel multi-utas (*multi-threaded Tokio RPC*).
-- Deteksi otomatis token sekunder ERC-20 & BEP-20 (USDT, USDC, DAI, WBTC, LINK, UNI, CAKE, dll.) dan token SPL Solana (USDC, USDT, BONK, JUP, RAY, WIF, dll.).
+### 4. 📊 Pemindai Saldo Multi-Chain & Realtime Valuation
+- **Pemindaian Saldo Paralel**: Multi-threaded Tokio RPC untuk jaringan EVM, Solana, dan Bitcoin.
+- **Deteksi Token Sekunder**: Deteksi otomatis token ERC-20 & BEP-20 (USDT, USDC, DAI, WBTC, LINK, UNI, CAKE, dll.) dan token SPL Solana (USDC, USDT, BONK, JUP, RAY, WIF, dll.).
+- **Real-Time Multi-Currency Valuation**: Agregasi harga pasar multi-aset dengan dukungan 13 mata uang fiat/kripto (USD, IDR, EUR, GBP, JPY, CAD, AUD, CHF, SGD, CNY, INR, KRW, BRL), dilengkapi penanganan fallback terpusat dan indikator status visual `● Offline` yang bersih saat data berstatus *stale*.
+- **Presisi Pembacaan Bitcoin**: Parser saldo native Bitcoin yang akurat membedah respons RPC Mempool dan Blockstream.
 
 ### 5. ⚡ Batch Sweeper & Smart File Extractor
 - **Batch Sweeper**: Mengonsolidasikan saldo dari banyak dompet ke satu alamat penampung dengan estimasi gas EIP-1559 otomatis dan penandatanganan transaksi secara lokal (*offline signing*).
@@ -78,9 +80,10 @@ inspectorwallet/
 │
 ├── src-tauri/                            # Backend Native Rust (Tauri v2)
 │   ├── src/
-│   │   ├── adapters/                     # Adapter Jaringan Blockchain
+│   │   ├── adapters/                     # Adapter Jaringan Blockchain & Oracle
 │   │   │   ├── evm/                      # [Live] Klien RPC EVM & definisi token ERC-20
 │   │   │   ├── solana/                   # [Live] Klien RPC Solana & metadata SPL token
+│   │   │   ├── pricing/                  # [Live] Oracle agregator harga pasar (CoinGecko provider)
 │   │   │   ├── bridge/                   # [Roadmap Stub] Cross-chain bridge adapter
 │   │   │   └── explorers/                # [Roadmap Stub] Explorer URL router hub
 │   │   ├── app/                          # IPC Application Layer
@@ -88,10 +91,10 @@ inspectorwallet/
 │   │   │   └── state.rs                  # [Roadmap Stub] Application runtime state
 │   │   ├── core/                         # Domain Logika Inti
 │   │   │   ├── scanner/                  # [Live] Multi-threaded concurrent balance scanner
-│   │   │   │   ├── bitcoin.rs            # [Live] Bitcoin Mempool / Blockstream scanner
+│   │   │   │   ├── bitcoin.rs            # [Live] Bitcoin Mempool / Blockstream scanner & amount parser
 │   │   │   │   ├── evm.rs                # [Live] EVM concurrent scanner
 │   │   │   │   ├── solana.rs             # [Live] Solana balance scanner
-│   │   │   │   └── pricing.rs            # [Roadmap Stub] Pricing feed service
+│   │   │   │   └── pricing.rs            # [Live] Pricing feed service & baseline fallback
 │   │   │   ├── security/                 # [Live] Argon2id, PBKDF2, AES-GCM, & memory zeroize
 │   │   │   ├── vault/                    # [Live] Manajemen direktori & repository SQLite
 │   │   │   │   ├── repository.rs         # [Live] SQLite repository & vault path
@@ -153,7 +156,7 @@ npm run tauri dev
 cd src-tauri
 cargo test --lib
 ```
-*Memverifikasi 24 unit test kriptografi, derivasi Bitcoin/EVM/Solana, memory zeroize, dan in-memory recovery lifecycle.*
+*Memverifikasi 30 unit test kriptografi, derivasi Bitcoin/EVM/Solana, pricing engine fallback, Bitcoin amount parser, memory zeroize, dan in-memory recovery lifecycle.*
 
 ### 3. Membangun Paket Distribusi (.exe / Installer):
 ```bash
