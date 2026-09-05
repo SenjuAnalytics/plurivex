@@ -36,9 +36,11 @@ Aplikasi ini menggabungkan manajemen identitas kunci multi-chain (EVM, Solana, d
 ### 3. 🛡️ Keamanan & Privasi Tingkat Tinggi
 - **Enkripsi Brankas Modern**: Menggunakan algoritma **Argon2id (PLX1) + AES-256-GCM** dengan salt unik 16-byte dan nonce 12-byte, serta kompatibilitas mundur (*backward compatibility*) otomatis dengan format PBKDF2 lama.
 - **Otentikasi Ganda**: Mendukung Master Password utama dan 6-Digit Quick PIN untuk kenyamanan navigasi harian.
-- **Air-Gapped Safe Mode**: Saklar hardware-level di Rust yang secara instan memblokir seluruh koneksi RPC dan jaringan keluar saat memeriksa frasa sensitif.
+- **Air-Gapped Safe Mode (Fail-Closed)**: Saklar isolasi level kernel/Rust yang **default aktif (fail-closed)** sejak startup aplikasi dan tersinkronisasi dua arah via IPC Tauri dengan antarmuka React, memblokir 100% lalu lintas jaringan saat menginspeksi atau memulihkan kunci sensitif.
+- **Proteksi Ekspor Plaintext (Guardrail)**: Dialog konfirmasi keamanan interaktif sebelum mengekspor seed phrase atau private key ke harddisk, dilengkapi derivasi otomatis kunci privat Bitcoin format WIF (*Wallet Import Format*).
+- **Proteksi Konkurensi Basis Data**: Konfigurasi `PRAGMA busy_timeout = 5000;` dan `PRAGMA journal_mode = WAL;` pada koneksi Rust (`rusqlite`) dan TypeScript (`@tauri-apps/plugin-sql`) untuk mencegah *database lock contention*.
 - **Native OS Clipboard Auto-Clear**: Timer native Windows level User32 yang menghapus clipboard secara otomatis setelah 30 detik, bahkan jika jendela aplikasi diminimalkan atau tidak fokus.
-- **Memori Aman (*Zeroize*)**: Buffer sensitif dibersihkan (*securely zeroed*) dari RAM setelah selesai digunakan.
+- **Memori Aman (*Zeroize*)**: Buffer sensitif dan frasa kandidat di RAM dibersihkan (*securely zeroed*) secara otomatis saat sesi pemulihan dibatalkan (*cancelled*) atau diselesaikan.
 
 ### 4. 📊 Pemindai Saldo Multi-Chain & Realtime Valuation
 - **Pemindaian Saldo Paralel**: Multi-threaded Tokio RPC untuk jaringan EVM, Solana, dan Bitcoin.
@@ -103,9 +105,9 @@ inspectorwallet/
 │   │   │   ├── wallets/                  # [Live] Kriptografi dompet & pemulihan seed
 │   │   │   │   ├── derivation.rs         # [Live] Derivasi EVM, Solana, & Bitcoin Native SegWit
 │   │   │   │   ├── extractor.rs          # [Live] Parser log & pengekstraksi kredensial
-│   │   │   │   ├── fingerprint.rs        # [Roadmap Stub] Hardware fingerprinting
+│   │   │   │   ├── fingerprint.rs        # [Live] SHA-256 cryptographic deduplication engine
 │   │   │   │   ├── import.rs             # [Live] Pemindai folder native ultra-cepat
-│   │   │   │   ├── recovery_session.rs   # [Live] In-Memory Recovery Engine (Atomics & RAM cache)
+│   │   │   │   ├── recovery_session.rs   # [Live] In-Memory Recovery Engine (Atomics, Zeroize & RAM cache)
 │   │   │   │   └── repair/               # [Live] Modul Rayon Multi-Core Mnemonic Repair
 │   │   │   │       ├── fast_checksum.rs  # [Live] Bit-level validator 15ns per kata
 │   │   │   │       ├── single_missing.rs # [Live] 1-word missing solver
@@ -156,7 +158,7 @@ npm run tauri dev
 cd src-tauri
 cargo test --lib
 ```
-*Memverifikasi 30 unit test kriptografi, derivasi Bitcoin/EVM/Solana, pricing engine fallback, Bitcoin amount parser, memory zeroize, dan in-memory recovery lifecycle.*
+*Memverifikasi 32 unit test kriptografi, derivasi Bitcoin/EVM/Solana, SHA-256 fingerprinting, pricing engine fallback, Bitcoin amount parser, memory zeroize, dan in-memory recovery lifecycle.*
 
 ### 3. Membangun Paket Distribusi (.exe / Installer):
 ```bash
