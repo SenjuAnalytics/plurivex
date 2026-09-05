@@ -1,4 +1,4 @@
-# 🛡️ Plurivex (Inspector Wallet)
+# 🛡️ Plurivex
 
 > **The Ultimate Multi-Chain Desktop Security Vault, Forensic Seed Phrase Recovery Suite, and Batch Execution Console.**  
 > *Built with Rust (Tauri v2 Core) • React 19 • TypeScript • Vite • Rayon Parallel Computing • SQLite Local Encrypted Vault*
@@ -57,7 +57,7 @@ Aplikasi ini menggabungkan manajemen identitas kunci multi-chain (EVM, Solana, d
 ## 🏗️ Arsitektur Proyek
 
 ```
-inspectorwallet/
+plurivex/
 ├── src/                                  # Frontend React 19 + TypeScript + Vite
 │   ├── components/                       # Komponen Antarmuka Pengguna
 │   │   ├── repair-workspace/             # Mnemonic Forensic Repair Workspace
@@ -171,7 +171,7 @@ Hasil installer biner (`.msi` dan `.exe`) akan tersimpan di:
 
 ## 🔒 Jaminan Keamanan & Panduan Pengguna
 
-1. **Kerahasiaan Kata Sandi**: Kata sandi Master Password Anda digunakan secara langsung untuk menurunkan kunci enkripsi Argon2id. Jangan pernah membagikan file database lokal `wallet_inspector.db`.
+1. **Kerahasiaan Kata Sandi**: Kata sandi Master Password Anda digunakan secara langsung untuk menurunkan kunci enkripsi Argon2id. Jangan pernah membagikan file database lokal `plurivex.db`.
 2. **Zero-Disk Privasi Sesi Pemulihan**: Mesin pemulihan frasa bekerja 100% di memori RAM. Jika komputer dimatikan atau aplikasi ditutup, data frasa yang belum disimpan ke vault akan otomatis musnah dari memori tanpa meninggalkan jejak di harddisk.
 3. **Air-Gapped Mode**: Saat memasukkan frasa pemulihan bernilai tinggi, aktifkan tombol **`🛡️ Safe Mode`** pada header bilah atas untuk memutus seluruh akses jaringan ke RPC blockchain.
 4. **Perangkat Tepercaya**: Selalu jalankan aplikasi pada komputer pribadi yang bebas dari malware dan keylogger.

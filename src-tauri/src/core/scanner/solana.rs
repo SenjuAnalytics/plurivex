@@ -22,7 +22,7 @@ pub async fn scan_solana_for_wallet(
         let post_native = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&native_payload)
             .send()
             .await;
@@ -41,7 +41,7 @@ pub async fn scan_solana_for_wallet(
                     let spl_res = client
                         .post(*rpc)
                         .header("Content-Type", "application/json")
-                        .header("User-Agent", "WalletInspector/1.0")
+                        .header("User-Agent", "Plurivex/1.0")
                         .json(&serde_json::json!({
                             "jsonrpc": "2.0",
                             "id": 2,

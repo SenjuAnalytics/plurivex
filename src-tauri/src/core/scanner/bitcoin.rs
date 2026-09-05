@@ -27,7 +27,7 @@ pub async fn scan_bitcoin_for_wallet(
         let url = format!("{}/address/{}", rpc.trim_end_matches('/'), address);
         let req = client
             .get(&url)
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .timeout(std::time::Duration::from_secs(12))
             .send()
             .await;

@@ -48,7 +48,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:wallet_inspector.db", migrations)
+                .add_migrations("sqlite:plurivex.db", migrations)
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())

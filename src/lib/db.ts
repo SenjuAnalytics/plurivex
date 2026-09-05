@@ -2,7 +2,7 @@ import Database from "@tauri-apps/plugin-sql";
 import type { WalletRecord, WalletType } from "./types";
 import { CHAINS } from "./chains";
 
-const DB_PATH = "sqlite:wallet_inspector.db";
+const DB_PATH = "sqlite:plurivex.db";
 let db: Database | null = null;
 
 export async function getDb() {

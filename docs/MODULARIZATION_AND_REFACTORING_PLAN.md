@@ -165,7 +165,7 @@ Memecah `src/styles/global.css` (2.694 baris) menjadi file-file modular di `src/
 ## 6. Struktur Folder & Penamaan File Baru
 
 ```
-inspectorwallet/
+plurivex/
 ├── docs/
 │   └── MODULARIZATION_AND_REFACTORING_PLAN.md  <-- Dokumen ini
 ├── src/

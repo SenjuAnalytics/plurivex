@@ -1,12 +1,12 @@
 [package]
-name = "wallet-inspector"
+name = "plurivex"
 version = "0.1.0"
 description = "Plurivex - High-Performance Multi-Chain Security Vault & Recovery Suite"
 authors = ["Plurivex Labs"]
 edition = "2021"
 
 [lib]
-name = "wallet_inspector_lib"
+name = "plurivex_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -3244,6 +3244,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "plurivex"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "base64 0.22.1",
+ "bech32",
+ "bip32",
+ "bip39",
+ "bs58",
+ "ed25519-dalek",
+ "futures",
+ "hex",
+ "hmac",
+ "k256",
+ "pbkdf2",
+ "rand 0.8.6",
+ "rayon",
+ "reqwest 0.12.28",
+ "ripemd",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-sql",
+ "tokio",
+]
+
+[[package]]
 name = "png"
 version = "0.17.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5742,41 +5777,6 @@ checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
 dependencies = [
  "same-file",
  "winapi-util",
-]
-
-[[package]]
-name = "wallet-inspector"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "argon2",
- "base64 0.22.1",
- "bech32",
- "bip32",
- "bip39",
- "bs58",
- "ed25519-dalek",
- "futures",
- "hex",
- "hmac",
- "k256",
- "pbkdf2",
- "rand 0.8.6",
- "rayon",
- "reqwest 0.12.28",
- "ripemd",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "sha3",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-sql",
- "tokio",
 ]
 
 [[package]]

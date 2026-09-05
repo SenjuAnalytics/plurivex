@@ -1,6 +1,6 @@
-# 🔍 Audit Teknis — Plurivex (Inspector Wallet)
+# 🔍 Audit Teknis — Plurivex
 
-**Repo:** `SenjuAnalytics/plurix` · **Branch:** `arena/01a07166-plurix`
+**Repo:** `SenjuAnalytics/plurivex` · **Branch:** `main`
 **Tanggal audit:** 2026-09-05
 **Metode:** pembacaan kode + verifikasi empiris (typecheck, build, eksekusi runtime nyata, grep call-graph). Semua temuan di bawah punya bukti yang bisa direproduksi.
 

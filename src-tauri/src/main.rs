@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    wallet_inspector_lib::run()
+    plurivex_lib::run()
 }

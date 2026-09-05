@@ -117,7 +117,7 @@ pub async fn get_chain_fee_data(
         let resp = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -186,7 +186,7 @@ pub async fn get_account_nonce_and_balance(
         let resp = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&batch)
             .send()
             .await;
@@ -240,7 +240,7 @@ pub async fn broadcast_raw_tx(
         let resp = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,

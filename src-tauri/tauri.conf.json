@@ -28,7 +28,7 @@
   },
   "plugins": {
     "sql": {
-      "preload": ["sqlite:wallet_inspector.db"]
+      "preload": ["sqlite:plurivex.db"]
     }
   },
   "bundle": {
@@ -37,7 +37,7 @@
     "copyright": "Copyright © 2026 Plurivex Labs. All rights reserved.",
     "category": "Finance",
     "shortDescription": "Multi-Chain Desktop Security Vault & Forensic Tool",
-    "longDescription": "High-performance non-custodial multi-chain wallet inspector, forensic mnemonic recovery, and batch sweep suite.",
+    "longDescription": "High-performance non-custodial multi-chain security vault, forensic mnemonic recovery, and batch sweep suite.",
     "publisher": "Plurivex Labs",
     "icon": [
       "icons/32x32.png",

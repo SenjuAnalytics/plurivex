@@ -28,6 +28,7 @@ src-tauri/gen
 *.env.*
 wallet_inspector.db
 plurix.db
+plurivex.db
 
 # Editor directories and files
 .vscode/*

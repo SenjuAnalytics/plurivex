@@ -70,7 +70,7 @@ pub async fn get_solana_recent_blockhash(rpcs: &[&str]) -> Result<String, String
         let resp = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -105,7 +105,7 @@ pub async fn broadcast_solana_tx(rpcs: &[&str], raw_tx_base64: &str) -> Result<S
         let resp = client
             .post(*rpc)
             .header("Content-Type", "application/json")
-            .header("User-Agent", "WalletInspector/1.0")
+            .header("User-Agent", "Plurivex/1.0")
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,
