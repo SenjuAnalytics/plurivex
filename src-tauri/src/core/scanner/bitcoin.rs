@@ -78,3 +78,55 @@ pub async fn scan_bitcoin_for_wallet(
 
     Err(last_err)
 }
+
+/// Parse kembali jumlah BTC dari string display `format_btc_display`
+/// ("0 BTC" | "0.0045 BTC" | "< 0.000001 BTC (0.00000012)").
+/// Mengembalikan 0.0 bila format tidak dikenali (tidak pernah menebak).
+pub fn parse_btc_display_amount(display: &str) -> f64 {
+    let trimmed = display.trim();
+    if let Some(rest) = trimmed.strip_prefix('<') {
+        // Kasus "< 0.000001 BTC (x)": ambil angka di dalam kurung.
+        return rest
+            .split('(')
+            .nth(1)
+            .and_then(|s| s.split(')').next())
+            .and_then(|s| s.trim().parse::<f64>().ok())
+            .unwrap_or(0.0);
+    }
+    trimmed
+        .split_whitespace()
+        .next()
+        .and_then(|tok| tok.parse::<f64>().ok())
+        .unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    #[test]
+    fn parses_plain_amount() {
+        assert_eq!(parse_btc_display_amount("0.0045 BTC"), 0.0045);
+        assert_eq!(parse_btc_display_amount("1.25 BTC"), 1.25);
+    }
+
+    #[test]
+    fn parses_zero() {
+        assert_eq!(parse_btc_display_amount("0 BTC"), 0.0);
+    }
+
+    #[test]
+    fn parses_dust_with_parenthesized_amount() {
+        let (amt, display) = format_btc_display(12); // 12 satoshi
+        assert!(display.starts_with('<'));
+        assert_eq!(parse_btc_display_amount(&display), amt);
+        assert_eq!(parse_btc_display_amount("< 0.000001 BTC (0.00000012)"), 0.00000012);
+    }
+
+    #[test]
+    fn unknown_format_returns_zero() {
+        assert_eq!(parse_btc_display_amount("error dari RPC"), 0.0);
+        assert_eq!(parse_btc_display_amount(""), 0.0);
+    }
+}
+

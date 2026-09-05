@@ -378,7 +378,8 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
         {
             if res.has_funds {
                 has_funds = true;
-                let parsed_btc = res.native_balance.parse::<f64>().unwrap_or(0.001);
+                let parsed_btc =
+                    crate::core::scanner::bitcoin::parse_btc_display_amount(&res.native_balance);
                 total_usd += (parsed_btc * btc_price).max(0.01);
             }
             btc_balance_str = Some(res.native_balance);
