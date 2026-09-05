@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import bs58 from "bs58";
 import { ethers } from "ethers";
-import { wordlists } from "@ethersproject/wordlists";
 import { isBase58Line, normalizeSolSecret } from "./solana";
 import { walletFingerprint } from "./fingerprint";
 import { canonicalKey, classify, isSolanaKeyStr, isValidWalletEntry, normalizeInput } from "./wallet";
@@ -17,7 +16,7 @@ let bip39Set: Set<string> | null = null;
 function getBip39Set(): Set<string> {
   if (!bip39Set) {
     bip39Set = new Set();
-    const wl = wordlists.en;
+    const wl = ethers.wordlists.en;
     for (let i = 0; i < 2048; i++) bip39Set.add(wl.getWord(i));
   }
   return bip39Set;

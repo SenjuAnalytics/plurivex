@@ -6,7 +6,14 @@ const DB_PATH = "sqlite:wallet_inspector.db";
 let db: Database | null = null;
 
 export async function getDb() {
-  if (!db) db = await Database.load(DB_PATH);
+  if (!db) {
+    db = await Database.load(DB_PATH);
+    try {
+      await db.execute(
+        "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;"
+      );
+    } catch {}
+  }
   return db;
 }
 

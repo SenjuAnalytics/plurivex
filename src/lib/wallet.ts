@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
-import { wordlists } from "@ethersproject/wordlists";
 import {
   isBase58Line,
   isSolanaKeyStr,
@@ -27,7 +26,7 @@ let bip39Set: Set<string> | null = null;
 function getBip39Set(): Set<string> {
   if (!bip39Set) {
     bip39Set = new Set();
-    const wl = wordlists.en;
+    const wl = ethers.wordlists.en;
     for (let i = 0; i < 2048; i++) bip39Set.add(wl.getWord(i));
   }
   return bip39Set;

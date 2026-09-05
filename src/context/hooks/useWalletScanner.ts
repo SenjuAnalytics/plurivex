@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { rustScan } from '../../lib/scan';
 import { getAllWallets } from '../../lib/db';
 import { walletHasScanTarget } from '../../lib/wallet';
@@ -26,8 +27,27 @@ export function useWalletScanner({
     return saved !== null ? saved === 'true' : true;
   });
 
+  useEffect(() => {
+    const saved = localStorage.getItem('plurivex_air_gapped');
+    const initialVal = saved !== null ? saved === 'true' : true;
+    invoke<boolean>('set_air_gapped_mode', { enabled: initialVal })
+      .then((val) => {
+        setIsAirGapped(val);
+      })
+      .catch(() => {
+        invoke<boolean>('get_air_gapped_mode')
+          .then((val) => setIsAirGapped(val))
+          .catch(() => {});
+      });
+  }, []);
+
   const toggleAirGapped = useCallback(async () => {
     const nextVal = !isAirGapped;
+    try {
+      await invoke('set_air_gapped_mode', { enabled: nextVal });
+    } catch (err) {
+      console.warn('Failed to update air-gapped mode in Rust core:', err);
+    }
     setIsAirGapped(nextVal);
     localStorage.setItem('plurivex_air_gapped', String(nextVal));
     toast(

@@ -4,7 +4,7 @@ use crate::core::scanner::{execute_scan_balances, ChainKind, ScanSummary, CHAINS
 use crate::core::wallets::import::{scan_directory_native as core_scan_dir, NativeScanResult};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-pub static AIR_GAPPED_MODE: AtomicBool = AtomicBool::new(false);
+pub static AIR_GAPPED_MODE: AtomicBool = AtomicBool::new(true);
 
 #[tauri::command]
 pub fn set_air_gapped_mode(enabled: bool) -> Result<bool, String> {
@@ -314,6 +314,13 @@ pub async fn resume_recovery_session(session_id: String) -> Result<bool, String>
 #[tauri::command]
 pub async fn cancel_recovery_session(session_id: String) -> Result<bool, String> {
     crate::core::wallets::recovery_session::request_cancel_session(&session_id)
+}
+
+#[tauri::command]
+pub async fn clear_recovery_session(session_id: Option<String>) -> Result<bool, String> {
+    crate::core::wallets::recovery_session::clear_recovery_session(
+        session_id.as_deref().unwrap_or(""),
+    )
 }
 
 #[tauri::command]

@@ -39,6 +39,7 @@ pub fn run() {
             app::commands::pause_recovery_session,
             app::commands::resume_recovery_session,
             app::commands::cancel_recovery_session,
+            app::commands::clear_recovery_session,
             app::commands::get_recovery_session_status,
             app::commands::scan_phrase_on_the_fly,
             app::commands::get_token_prices,

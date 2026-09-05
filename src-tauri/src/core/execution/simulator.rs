@@ -1,2 +1,2 @@
-// Zero-loss transaction dry-run simulator
+/// TODO(plurix): Planned scaffold module for Phase 4 Tx Simulation engine (tree-first architecture).
 pub struct TxSimulator;

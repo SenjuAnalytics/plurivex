@@ -138,10 +138,18 @@ pub fn request_resume_session(session_id: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+pub fn clear_session_secrets() {
+    *ACTIVE_RAW_PHRASE.lock().unwrap() = None;
+    *ACTIVE_TARGET_ADDR.lock().unwrap() = None;
+    *CACHED_TARGET_MATCH.lock().unwrap() = None;
+    CACHED_SOLUTIONS.lock().unwrap().clear();
+}
+
 pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
     let active = ACTIVE_SESSION_ID.lock().unwrap();
     if active.as_deref() == Some(session_id) {
         CANCEL_FLAG.store(true, Ordering::SeqCst);
+        clear_session_secrets();
         Ok(true)
     } else {
         Err(format!(
@@ -149,6 +157,16 @@ pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
             session_id
         ))
     }
+}
+
+pub fn clear_recovery_session(session_id: &str) -> Result<bool, String> {
+    let mut active = ACTIVE_SESSION_ID.lock().unwrap();
+    if active.as_deref() == Some(session_id) || active.is_some() {
+        CANCEL_FLAG.store(true, Ordering::SeqCst);
+        *active = None;
+    }
+    clear_session_secrets();
+    Ok(true)
 }
 
 pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatusResponse, String> {
@@ -359,8 +377,11 @@ pub fn run_dual_word_session_worker(
             }
         } else {
             'outer_all_pairs: for (pair_idx, &(p1, p2)) in all_pairs.iter().enumerate() {
-                let base_indices = extract_base_indices(&tokens, &[p1, p2], word_list);
                 let pair_offset = pair_idx * 4_194_304;
+                if pair_offset + 4_194_304 <= start_from_index {
+                    continue 'outer_all_pairs;
+                }
+                let base_indices = extract_base_indices(&tokens, &[p1, p2], word_list);
 
                 for w1 in 0..2048u16 {
                     let mut test_indices = base_indices;
@@ -413,6 +434,10 @@ pub fn run_dual_word_session_worker(
                     }
                 }
             }
+        }
+
+        if CANCEL_FLAG.load(Ordering::SeqCst) {
+            clear_session_secrets();
         }
     });
 }

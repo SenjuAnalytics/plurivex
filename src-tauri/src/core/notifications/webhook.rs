@@ -1,2 +1,2 @@
-// Multi-channel webhook notifier (Discord/Slack/Telegram)
+/// TODO(plurix): Planned scaffold module for Phase 5 Webhook Notifier (tree-first architecture).
 pub struct WebhookNotifier;

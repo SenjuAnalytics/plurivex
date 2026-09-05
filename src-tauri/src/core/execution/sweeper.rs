@@ -1,2 +1,2 @@
-// Sweeper execution core service
+/// TODO(plurix): Planned scaffold module for Phase 4 Sweeper engine (tree-first architecture).
 pub struct SweeperService;

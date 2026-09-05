@@ -23,8 +23,10 @@ import { smartNormalizeInputNative } from "../../lib/extract";
 import {
   classify,
   deriveDualCredentials,
+  deriveDualCredentialsNative,
   deriveDualCredentialsBatchNative,
   walletHasScanTarget,
+  type DualCredentials,
 } from "../../lib/wallet";
 import type { ToastType, WalletView } from "../../lib/types";
 
@@ -297,6 +299,16 @@ export function useWalletOperations({
       return;
     }
 
+    if (options.filter !== "public_only") {
+      const confirmed = window.confirm(
+        "⚠️ PERINGATAN KEAMANAN: Anda akan mengekspor Secret Key / Seed Mnemonic dalam bentuk plaintext ke disk. Pastikan perangkat Anda aman. Lanjutkan ekspor?"
+      );
+      if (!confirmed) {
+        toast("Ekspor dibatalkan demi keamanan", "info");
+        return;
+      }
+    }
+
     const lines: string[] = [];
 
     if (options.format === "csv") {
@@ -312,10 +324,10 @@ export function useWalletOperations({
         for (let i = 0; i < targets.length; i++) {
           const w = targets[i];
           let secret = "";
-          let creds: ReturnType<typeof deriveDualCredentials> | null = null;
+          let creds: DualCredentials | null = null;
           try {
             secret = (await decrypt(w.encryptedSecret, masterPw)) ?? "";
-            creds = deriveDualCredentials(secret, w.type);
+            creds = await deriveDualCredentialsNative(secret, w.type);
           } catch {}
           const nativeBals = Object.entries(w.balances)
             .filter(([_, v]) => v && v !== "loading" && v !== "error" && !v.startsWith("0 "))
@@ -347,7 +359,7 @@ export function useWalletOperations({
         if (options.filter !== "public_only") {
           try {
             const secret = await decrypt(w.encryptedSecret, masterPw);
-            const creds = secret ? deriveDualCredentials(secret, w.type) : null;
+            const creds = secret ? await deriveDualCredentialsNative(secret, w.type) : null;
             if (w.type === "seed") {
               lines.push(`  • Mnemonic Seed:   ${secret}`);
             } else {

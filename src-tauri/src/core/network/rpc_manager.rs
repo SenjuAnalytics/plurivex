@@ -1,2 +1,2 @@
-// Custom RPC node manager
+/// TODO(plurix): Planned scaffold module for Phase 5 Custom RPC Node Manager (tree-first architecture).
 pub struct RpcManager;

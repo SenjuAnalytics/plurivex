@@ -72,6 +72,7 @@ commands.allow = [
   "pause_recovery_session",
   "resume_recovery_session",
   "cancel_recovery_session",
+  "clear_recovery_session",
   "get_recovery_session_status"
 ]
 

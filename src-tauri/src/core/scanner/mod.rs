@@ -136,22 +136,9 @@ pub async fn execute_scan_balances(
     }
 
     let conn = Connection::open(&path).map_err(|e| e.to_string())?;
-    let _ = conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
-
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS token_balances (
-            wallet_id INTEGER NOT NULL,
-            chain TEXT NOT NULL,
-            token_symbol TEXT NOT NULL,
-            token_name TEXT,
-            balance TEXT NOT NULL,
-            raw_balance TEXT,
-            contract_address TEXT,
-            updated_at TEXT,
-            PRIMARY KEY (wallet_id, chain, token_symbol, contract_address),
-            FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE CASCADE
-        );",
-        [],
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(5000));
+    let _ = conn.execute_batch(
+        "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;",
     );
 
     type WalletAddressTuple = (i64, Option<String>, Option<String>, Option<String>);
