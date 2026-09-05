@@ -45,10 +45,11 @@ contohfile/
 gambar/
 mockup-ui/
 
-# Private Architecture & Internal Docs
-docs/
-*ROADMAP*.md
-PLURIVEX_*.md
+# Internal Docs — policy: Architecture docs under docs/ are TRACKED.
+# Only local drafts and exports are excluded.
+docs/DRAFTS/
+docs/EXPORTS/
+*.export.csv
 
 # Deprecated / dead code staged for removal (not tracked, not shipped)
 _deprecated/

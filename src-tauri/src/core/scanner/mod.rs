@@ -239,7 +239,10 @@ pub async fn execute_scan_balances(
     let results = join_all(tasks).await;
 
     let mut write_conn = Connection::open(&path).map_err(|e| e.to_string())?;
-    let _ = write_conn.execute_batch("PRAGMA synchronous = NORMAL; PRAGMA journal_mode = WAL;");
+    let _ = write_conn.busy_timeout(std::time::Duration::from_millis(5000));
+    let _ = write_conn.execute_batch(
+        "PRAGMA synchronous = NORMAL; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;",
+    );
     let tx = write_conn.transaction().map_err(|e| e.to_string())?;
 
     let mut scanned_count = 0u32;

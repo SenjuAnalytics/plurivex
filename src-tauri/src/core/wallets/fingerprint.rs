@@ -1,4 +1,5 @@
 use base64::Engine;
+use bip39::Mnemonic;
 use sha2::{Digest, Sha256};
 
 pub fn canonical_key(text: &str) -> String {
@@ -8,12 +9,12 @@ pub fn canonical_key(text: &str) -> String {
         return format!("pk:{}", hex.to_ascii_lowercase());
     }
     let words: Vec<&str> = t.split_whitespace().collect();
-    if [12, 15, 18, 21, 24].contains(&words.len()) {
+    if [12, 15, 18, 21, 24].contains(&words.len()) && Mnemonic::parse_normalized(t).is_ok() {
         return format!("seed:{}", words.iter().map(|w| w.to_ascii_lowercase()).collect::<Vec<_>>().join(" "));
     }
     if let Ok(bytes) = bs58::decode(t).into_vec() {
         if bytes.len() == 32 || bytes.len() == 64 {
-            return format!("sol:{}", t);
+            return format!("sol:{}", bs58::encode(&bytes).into_string());
         }
     }
     format!("seed:{}", words.iter().map(|w| w.to_ascii_lowercase()).collect::<Vec<_>>().join(" "))
@@ -50,5 +51,19 @@ mod tests {
             canonical,
             "pk:4f3edf983ac636a65a842ce7c78d3270fad800125aa24e83cb4b08b204ad9ee8"
         );
+    }
+
+    #[test]
+    fn test_canonical_key_seed_and_solana() {
+        let valid_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        assert_eq!(
+            canonical_key(valid_mnemonic),
+            "seed:abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        );
+
+        // 32-byte dummy Solana key in Base58
+        let sol_bytes = [7u8; 32];
+        let sol_b58 = bs58::encode(&sol_bytes).into_string();
+        assert_eq!(canonical_key(&sol_b58), format!("sol:{}", sol_b58));
     }
 }
