@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 export interface FundedWalletData {
@@ -15,6 +16,7 @@ interface FundedWalletModalProps {
   isOpen: boolean;
   data: FundedWalletData | null;
   onClose: () => void;
+  onConfirmImport?: (phrase: string) => Promise<boolean>;
   onOpenInVault?: () => void;
   onOpenInSweeper?: () => void;
 }
@@ -23,13 +25,58 @@ export function FundedWalletModal({
   isOpen,
   data,
   onClose,
+  onConfirmImport,
   onOpenInVault,
   onOpenInSweeper,
 }: FundedWalletModalProps) {
+  const [isImported, setIsImported] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsImported(false);
+      setIsImporting(false);
+      setCopied(false);
+    }
+  }, [isOpen, data?.phrase]);
+
   if (!isOpen || !data) return null;
 
   const handleCopyPhrase = () => {
     navigator.clipboard.writeText(data.phrase);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
+
+  const handleImportToVault = async () => {
+    setIsImporting(true);
+    let success = true;
+    if (onConfirmImport) {
+      success = await onConfirmImport(data.phrase);
+    }
+    setIsImporting(false);
+    if (success) {
+      setIsImported(true);
+      if (onOpenInVault) {
+        onOpenInVault();
+      }
+    }
+  };
+
+  const handleImportAndSweep = async () => {
+    setIsImporting(true);
+    let success = true;
+    if (onConfirmImport) {
+      success = await onConfirmImport(data.phrase);
+    }
+    setIsImporting(false);
+    if (success) {
+      setIsImported(true);
+      if (onOpenInSweeper) {
+        onOpenInSweeper();
+      }
+    }
   };
 
   return createPortal(
@@ -45,10 +92,31 @@ export function FundedWalletModal({
           </span>
         </div>
 
-        <h2 className="jackpot-title">Dompet Berisi Saldo Ditemukan!</h2>
+        <h2 className="jackpot-title">
+          {isImported ? "Dompet Berhasil Diamankan ke Vault!" : "Dompet Berisi Saldo Ditemukan!"}
+        </h2>
         <p className="jackpot-subtitle">
-          Kombinasi frasa pemulihan valid terdeteksi memiliki saldo on-chain aktif dan telah otomatis diamankan ke Vault terenkripsi lokal Anda.
+          {isImported
+            ? "Frasa pemulihan telah disimpan secara lokal ke Vault SQLite terenkripsi Argon2id Anda."
+            : "Kombinasi frasa pemulihan valid terdeteksi memiliki saldo on-chain aktif. Tinjau rincian di bawah ini sebelum menyimpannya ke Vault lokal terenkripsi."}
         </p>
+
+        {/* Guardrail Banner */}
+        {isImported ? (
+          <div className="jackpot-saved-banner">
+            <span className="jackpot-guardrail-icon">✅</span>
+            <div>
+              <strong>Tersimpan di Vault:</strong> Dompet telah masuk ke database lokal dan siap dipantau atau disweep.
+            </div>
+          </div>
+        ) : (
+          <div className="jackpot-guardrail-banner">
+            <span className="jackpot-guardrail-icon">🛡️</span>
+            <div>
+              <strong>Guardrail Vault Aktif:</strong> Dompet ini <u>belum</u> disimpan ke database lokal. Konfirmasi penyimpanan di bawah, atau salin frasa saja demi keamanan.
+            </div>
+          </div>
+        )}
 
         {/* Mnemonic Box */}
         <div className="jackpot-phrase-box">
@@ -99,38 +167,81 @@ export function FundedWalletModal({
         </div>
 
         {/* Action Buttons */}
+        {/* Action Buttons with Guardrail Confirmation */}
         <div className="jackpot-actions-row">
-          <button
-            type="button"
-            className="btn btn-primary jackpot-primary-btn"
-            onClick={() => {
-              if (onOpenInVault) onOpenInVault();
-              onClose();
-            }}
-          >
-            🔐 Buka di Vault
-          </button>
+          {!isImported ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary jackpot-primary-btn"
+                disabled={isImporting}
+                onClick={handleImportToVault}
+              >
+                {isImporting ? "Menyimpan…" : "🔐 Simpan ke Vault"}
+              </button>
 
-          {onOpenInSweeper && (
-            <button
-              type="button"
-              className="btn btn-outline-accent"
-              onClick={() => {
-                onOpenInSweeper();
-                onClose();
-              }}
-            >
-              ⚡ Buka di Sweeper
-            </button>
+              {onOpenInSweeper && (
+                <button
+                  type="button"
+                  className="btn btn-outline-accent"
+                  disabled={isImporting}
+                  onClick={handleImportAndSweep}
+                >
+                  ⚡ Simpan & Sweep
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="jackpot-btn-copy-only"
+                onClick={handleCopyPhrase}
+              >
+                {copied ? "✓ Tersalin!" : "📋 Salin Saja"}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={onClose}
+              >
+                Abaikan
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary jackpot-primary-btn"
+                onClick={() => {
+                  if (onOpenInVault) onOpenInVault();
+                  onClose();
+                }}
+              >
+                🔐 Buka di Vault
+              </button>
+
+              {onOpenInSweeper && (
+                <button
+                  type="button"
+                  className="btn btn-outline-accent"
+                  onClick={() => {
+                    onOpenInSweeper();
+                    onClose();
+                  }}
+                >
+                  ⚡ Buka di Sweeper
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={onClose}
+              >
+                Tutup
+              </button>
+            </>
           )}
-
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={onClose}
-          >
-            Tutup
-          </button>
         </div>
       </div>
     </div>,

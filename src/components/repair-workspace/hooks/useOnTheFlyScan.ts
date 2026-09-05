@@ -17,6 +17,7 @@ export function useOnTheFlyScan() {
   const isWorkerRunningRef = useRef<boolean>(false);
   const fundedCountRef = useRef<number>(0);
   const processedCountRef = useRef<number>(0);
+  const isAwaitingConfirmationRef = useRef<boolean>(false);
 
   const processQueueWorker = useCallback(async () => {
     if (isWorkerRunningRef.current) return;
@@ -24,6 +25,11 @@ export function useOnTheFlyScan() {
     setIsOnTheFlyScanning(true);
 
     while (queueRef.current.length > 0 && !cancelScanRef.current) {
+      if (isAwaitingConfirmationRef.current) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+
       const phrase = queueRef.current.shift()!;
       processedCountRef.current += 1;
 
@@ -61,14 +67,10 @@ export function useOnTheFlyScan() {
           // Play victory chime sound
           sound.playSuccessChime();
 
-          // Auto-import winning funded wallet into encrypted Vault
-          try {
-            await importWallets([phrase]);
-          } catch (e) {
-            console.error("Auto import funded wallet error:", e);
-          }
+          // Guardrail: Pause worker loop to await user explicit confirmation
+          isAwaitingConfirmationRef.current = true;
 
-          // Trigger Funded Wallet Celebration Modal
+          // Trigger Funded Wallet Celebration Modal (Pending user confirmation)
           setFundedWalletData({
             phrase: result.phrase,
             btcAddress: result.btcAddress,
@@ -80,7 +82,7 @@ export function useOnTheFlyScan() {
             totalUsdEstimate: result.totalUsdEstimate,
           });
           setIsFundedWalletOpen(true);
-          toast(`🎉 DOMPET DENGAN SALDO DITEMUKAN SECARA LIVE! Berhasil disimpan ke Vault.`, "success");
+          toast(`🎉 DOMPET DENGAN SALDO DITEMUKAN! Konfirmasi untuk menyimpan ke Vault.`, "success");
         }
       } catch (err) {
         console.warn("Scan phrase on the fly error:", err);
@@ -91,7 +93,32 @@ export function useOnTheFlyScan() {
     if (queueRef.current.length === 0) {
       setIsOnTheFlyScanning(false);
     }
-  }, [importWallets, isAirGapped, toast]);
+  }, [isAirGapped, toast]);
+
+  // Explicit confirmation import guarded by user interaction
+  const confirmImportFundedWallet = useCallback(
+    async (phrase: string): Promise<boolean> => {
+      try {
+        const { added, skipped } = await importWallets([phrase]);
+        if (added > 0) {
+          toast("🎉 Dompet jackpot berhasil disimpan ke Vault lokal terenkripsi!", "success");
+        } else if (skipped > 0) {
+          toast("Dompet ini sudah ada di dalam Vault Anda.", "info");
+        }
+        return true;
+      } catch (e) {
+        console.error("Import jackpot wallet error:", e);
+        toast(`Gagal menyimpan dompet ke Vault: ${String(e)}`, "error");
+        return false;
+      }
+    },
+    [importWallets, toast]
+  );
+
+  const dismissFundedWallet = useCallback(() => {
+    isAwaitingConfirmationRef.current = false;
+    setIsFundedWalletOpen(false);
+  }, []);
 
   // Feed phrases continuously during the search loop
   const enqueuePhrases = useCallback((phrases: string[]) => {
@@ -121,6 +148,7 @@ export function useOnTheFlyScan() {
 
   const resetScanQueue = useCallback(() => {
     cancelScanRef.current = false;
+    isAwaitingConfirmationRef.current = false;
     queueRef.current = [];
     seenSetRef.current.clear();
     processedCountRef.current = 0;
@@ -131,6 +159,7 @@ export function useOnTheFlyScan() {
 
   const stopScan = useCallback(() => {
     cancelScanRef.current = true;
+    isAwaitingConfirmationRef.current = false;
     queueRef.current = [];
     setIsOnTheFlyScanning(false);
   }, []);
@@ -141,6 +170,8 @@ export function useOnTheFlyScan() {
     isFundedWalletOpen,
     setIsFundedWalletOpen,
     fundedWalletData,
+    confirmImportFundedWallet,
+    dismissFundedWallet,
     enqueuePhrases,
     resetScanQueue,
     stopScan,

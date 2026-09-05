@@ -360,10 +360,10 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
     let price_report = crate::adapters::pricing::coingecko::get_cached_or_fetch_prices(None)
         .await
         .unwrap_or_else(|_| crate::core::scanner::pricing::PriceReport::baseline_fallback());
-    let btc_price = price_report.get_usd_price("btc").unwrap_or(65000.0);
-    let eth_price = price_report.get_usd_price("eth").unwrap_or(2600.0);
-    let bnb_price = price_report.get_usd_price("bnb").unwrap_or(580.0);
-    let sol_price = price_report.get_usd_price("sol").unwrap_or(140.0);
+    let btc_price = price_report.get_usd_price_or_baseline("btc");
+    let eth_price = price_report.get_usd_price_or_baseline("eth");
+    let bnb_price = price_report.get_usd_price_or_baseline("bnb");
+    let sol_price = price_report.get_usd_price_or_baseline("sol");
 
     let mut has_funds = false;
     let mut total_usd = 0.0;

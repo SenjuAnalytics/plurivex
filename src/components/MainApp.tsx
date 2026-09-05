@@ -217,7 +217,10 @@ export function MainApp() {
           <div className="detail-panel scrollable">
             {/* View Router */}
             {activeNav === "repair" ? (
-              <RepairWorkspace onBackToVault={() => setActiveNav("dashboard")} />
+              <RepairWorkspace
+                onBackToVault={() => setActiveNav("dashboard")}
+                onOpenInSweeper={() => setActiveNav("sweeper")}
+              />
             ) : activeNav === "sweeper" ? (
               <SweeperWorkspace onBack={() => setActiveNav("dashboard")} />
             ) : activeNav === "trader" ? (
@@ -321,6 +324,29 @@ export function MainApp() {
                         <small style={{ fontSize: "14px", color: "var(--text-dim)", fontWeight: 500 }}>
                           ({portfolioValuation.secondary})
                         </small>
+                      )}
+                      {pricing.priceReport?.stale && (
+                        <span
+                          className="val-offline-badge"
+                          title="Nilai estimasi berbasis kurs offline / tersimpan"
+                          style={{
+                            fontSize: "10.5px",
+                            padding: "2px 7px",
+                            borderRadius: "999px",
+                            background: "rgba(245, 158, 11, 0.12)",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            color: "#f59e0b",
+                            fontWeight: 600,
+                            letterSpacing: "0.02em",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            marginLeft: "4px",
+                          }}
+                        >
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />
+                          Offline
+                        </span>
                       )}
                     </div>
                     <div className="delta">

@@ -57,6 +57,17 @@ impl PriceReport {
         self.get_price(key, "usd")
     }
 
+    /// Return the USD price or fallback to baseline fallback quote
+    pub fn get_usd_price_or_baseline(&self, key: &str) -> f64 {
+        if let Some(price) = self.get_usd_price(key) {
+            price
+        } else {
+            Self::baseline_fallback()
+                .get_usd_price(key)
+                .unwrap_or(0.0)
+        }
+    }
+
     /// Return the IDR price for a standard symbol or CoinGecko ID
     pub fn get_idr_price(&self, key: &str) -> Option<f64> {
         self.get_price(key, "idr")
@@ -181,6 +192,8 @@ mod tests {
         assert_eq!(report.get_usd_price("ETH"), Some(2600.0));
         assert_eq!(report.get_usd_price("BNB"), Some(580.0));
         assert_eq!(report.get_usd_price("SOL"), Some(140.0));
+        assert_eq!(report.get_usd_price_or_baseline("btc"), 65000.0);
+        assert_eq!(report.get_usd_price_or_baseline("unknown_coin"), 0.0);
         assert!(report.get_idr_price("BTC").unwrap() > 1_000_000_000.0);
     }
 }

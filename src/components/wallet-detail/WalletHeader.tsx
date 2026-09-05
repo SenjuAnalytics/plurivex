@@ -162,7 +162,7 @@ export function WalletHeader({
           </div>
         </div>
 
-        {/* Compact Valuation Bar with Multi-Currency Selector & Live CoinGecko Oracle */}
+        {/* Compact Valuation Bar with Multi-Currency Selector */}
         {totalUsd > 0 && (
           <div className="hero-valuation-strip">
             <div className="valuation-strip-left">
@@ -182,6 +182,29 @@ export function WalletHeader({
                 {valuation.secondary && (
                   <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 500 }}>
                     ({valuation.secondary})
+                  </span>
+                )}
+                {pricing.priceReport?.stale && (
+                  <span
+                    className="val-offline-badge"
+                    title="Nilai estimasi berbasis kurs offline / tersimpan"
+                    style={{
+                      fontSize: "9.5px",
+                      padding: "1px 6px",
+                      borderRadius: "999px",
+                      background: "rgba(245, 158, 11, 0.12)",
+                      border: "1px solid rgba(245, 158, 11, 0.28)",
+                      color: "#f59e0b",
+                      fontWeight: 600,
+                      letterSpacing: "0.02em",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      marginLeft: "2px",
+                    }}
+                  >
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />
+                    Offline
                   </span>
                 )}
               </div>

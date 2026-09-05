@@ -15,6 +15,7 @@ import type { SessionStats, ParsedSolution } from "./types";
 interface RepairWorkspaceProps {
   initialPhrase?: string;
   onBackToVault: () => void;
+  onOpenInSweeper?: () => void;
   onApplyRepairedPhrase?: (phrase: string) => void;
 }
 
@@ -76,6 +77,7 @@ function findChangedWordIndices(originalWords: string[], candidateWords: string[
 export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
   initialPhrase = "",
   onBackToVault,
+  onOpenInSweeper,
   onApplyRepairedPhrase,
 }) => {
   const { toast, importWallets } = useApp();
@@ -100,8 +102,9 @@ export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
     isOnTheFlyScanning,
     scanProgressInfo,
     isFundedWalletOpen,
-    setIsFundedWalletOpen,
     fundedWalletData,
+    confirmImportFundedWallet,
+    dismissFundedWallet,
     enqueuePhrases,
     resetScanQueue,
     stopScan,
@@ -495,15 +498,24 @@ export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
         />
       </div>
 
-      {/* Celebratory Funded Wallet Modal */}
+      {/* Celebratory Funded Wallet Modal with Guardrail */}
       <FundedWalletModal
         isOpen={isFundedWalletOpen}
         data={fundedWalletData}
-        onClose={() => setIsFundedWalletOpen(false)}
+        onClose={dismissFundedWallet}
+        onConfirmImport={confirmImportFundedWallet}
         onOpenInVault={() => {
-          setIsFundedWalletOpen(false);
+          dismissFundedWallet();
           onBackToVault();
         }}
+        onOpenInSweeper={
+          onOpenInSweeper
+            ? () => {
+                dismissFundedWallet();
+                onOpenInSweeper();
+              }
+            : undefined
+        }
       />
     </div>
   );
