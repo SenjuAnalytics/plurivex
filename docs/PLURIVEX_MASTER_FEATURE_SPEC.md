@@ -142,10 +142,10 @@ Seluruh 60 kapabilitas fungsional Plurivex diklasifikasikan ke dalam **7 Pilar S
 #### 22. Staking & Delegated Rent Deactivator (Solana / EVM LST)
 * **Deskripsi:** Mendeteksi saldo SOL yang terlupakan di akun *Stake Delegated* atau *Validator Vote Account* di Solana, membatalkan delegasi (*deactivate stake*), dan mengembalikan modal SOL sewa akun ke saldo aktif.
 
-#### 23. Token Revoke Inspector (Anti-Drainer Guard)
+#### 23. Token Revoke Guard (Anti-Drainer)
 * **Deskripsi:** Pemindai izin pengeluaran token (*token approval/allowance*) pada smart contract yang pernah disetujui dompet, serta menyediakan antarmuka eksekusi untuk mencabut izin (*revoke*) kontrak yang berisiko atau mencurigakan.
 
-#### 24. Honeypot & Malicious Tax Pre-Flight Inspector
+#### 24. Honeypot & Malicious Tax Pre-Flight Guard
 * **Deskripsi:** Sebelum transaksi swap DEX massal dikirim, Plurivex melakukan simulasi lokal: mencoba mengeksekusi *Buy* mikro lalu langsung mencoba *Sell*. Jika token tidak bisa dijual atau pajaknya di atas 10%, transaksi massal langsung dicegah otomatis dengan peringatan *HONEYPOT DETECTED*.
 
 #### 25. Scam Token & Phishing Dust Cleaner (Zero-Value Purge)
@@ -308,8 +308,8 @@ Klasifikasi Status:
 | **20** | Solana Account Type & Rent Analysis | Pilar 3: Inspeksi & Audit | 🟢 **Complete & Live** | Read-Only Audit |
 | **21** | Solana Empty Token Rent Reclaimer | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 3) | Asset Recovery |
 | **22** | Staking & Delegated Rent Deactivator | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 3) | Asset Recovery |
-| **23** | Token Revoke Inspector (Anti-Drainer) | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Security Inspection |
-| **24** | Honeypot & Malicious Tax Pre-Flight Inspector | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Pre-Flight Security |
+| **23** | Token Revoke Guard (Anti-Drainer) | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Security Inspection |
+| **24** | Honeypot & Malicious Tax Pre-Flight Guard | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Pre-Flight Security |
 | **25** | Scam Token & Phishing Dust Cleaner | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Portfolio Hygiene |
 | **26** | Multi-Chain Pre-Flight Simulation (EVM & Solana) | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 2) | Pre-Flight Security |
 | **27** | ERC-4337 Smart Account & Paymaster Detector | Pilar 3: Inspeksi & Audit | ⏳ Planned (Fase 5) | Account Abstraction |
@@ -409,10 +409,10 @@ Roadmap di bawah dirancang untuk memastikan **Zero Architectural Rewrites**, di 
 
 * **Urutan 1 (Fitur #50): Multi-Proxy & IP Rotator Manager** — Jalur proksi agar scanning tidak terkena blacklist IP.
 * **Urutan 2 (Fitur #52): Multi-Endpoint RPC Hedging Race Engine** — Mengambil respons tercepat dari 3 RPC secara bersamaan untuk meminimalisir latensi.
-* **Urutan 3 (Fitur #24): Honeypot & Malicious Tax Pre-Flight Inspector** — Deteksi token jebakan pajak 99% sebelum dibeli.
+* **Urutan 3 (Fitur #24): Honeypot & Malicious Tax Pre-Flight Guard** — Deteksi token jebakan pajak 99% sebelum dibeli.
 * **Urutan 4 (Fitur #25): Scam Token & Phishing Dust Cleaner** — Membersihkan token sampah berbahaya dari portofolio.
 * **Urutan 5 (Fitur #26): Multi-Chain Pre-Flight Simulation Engine (EVM: `eth_call` & Solana: `simulateTransaction`)** — Mesin uji simulasi pra-eksekusi multi-chain sebelum gas dikeluarkan di jaringan.
-* **Urutan 6 (Fitur #23): Token Revoke Inspector** — Mencabut izin smart contract yang berisiko.
+* **Urutan 6 (Fitur #23): Token Revoke Guard** — Mencabut izin smart contract yang berisiko.
 * **Urutan 7 (Fitur #39): Radar Gas & Auto-Schedule** — Pemantau murahnya gas Gwei jaringan.
 
 ---

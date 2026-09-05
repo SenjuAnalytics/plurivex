@@ -26,8 +26,6 @@ src-tauri/gen
 *.sqlite3
 *.env
 *.env.*
-wallet_inspector.db
-plurix.db
 plurivex.db
 
 # Editor directories and files

@@ -407,7 +407,7 @@ Maestro Router 2 suffered an exploit leading to 280 ETH stolen due to:
 | **4** | **Extended Token Radar** | Auto-detection of popular tokens (USDT, USDC, PEPE, BONK, WIF, JUP, FLOKI) across all active chains. | Multicall batch RPC contract queries. |
 | **5** | **Flexible Vault Exporters** | Selective export presets: "Funded Wallets Only", "Public Addresses Only", "Full Encrypted Backup" (CSV/TXT). | Local export with AES-256 password protection. |
 | **6** | **Batch Disperser** | 1-to-N gas and token distribution engine (funding 50-100 fresh wallets from 1 parent wallet in 1 click). | Reverse sweeper engine; saves hours of manual gas funding. |
-| **7** | **Token Revoke Inspector** | Deep allowance scanner detecting dangerous/unlimited smart contract approvals with 1-click batch revoke. | Eliminates lingering drainer risk (Maestro/Multichain immunity). |
+| **7** | **Token Revoke Guard** | Deep allowance scanner detecting dangerous/unlimited smart contract approvals with 1-click batch revoke. | Eliminates lingering drainer risk (Maestro/Multichain immunity). |
 | **8** | **Custom RPC & Node Switcher** | User-defined custom RPC endpoints with real-time ping latency meters and automatic failover. | Bypasses public rate-limits; zero central server requirement. |
 | **9** | **Batch Wallet Generator** | Instant generation of 1 to 500+ fresh dual-chain (EVM & Solana) wallets in < 1 second. | Cryptographically secure bip39/ed25519 entropy derivation. |
 | **10** | **Audit Activity Log** | Permanent local ledger tracking every sweep, trade, and export with timestamps and gas accounting. | Indexed SQLite table for personal tax & bookkeeping. |
