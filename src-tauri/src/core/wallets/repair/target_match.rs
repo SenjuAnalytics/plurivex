@@ -1,64 +1,68 @@
 use super::types::TargetAddressMatch;
 
-/// Check if test phrase matches target address across Bitcoin, EVM, and Solana
+/// Check if test phrase matches target address by selectively deriving ONLY the target chain
 pub fn check_target_match(
     target: &str,
     test_phrase: &str,
     position_index: usize,
     word: &str,
 ) -> Option<TargetAddressMatch> {
-    if let Ok(creds) =
-        crate::core::wallets::derivation::derive_public_addresses_only_native(test_phrase)
-    {
-        let is_evm = target.starts_with("0x") || target.len() == 42;
-        let is_btc =
-            target.starts_with("bc1") || target.starts_with('1') || target.starts_with('3');
+    let t = target.trim();
+    let is_evm = t.starts_with("0x") || t.starts_with("0X");
+    let is_btc = t.starts_with("bc1") || t.starts_with('1') || t.starts_with('3');
 
-        if is_btc {
-            if let Some(ref addr) = creds.btc_address {
-                if addr.eq_ignore_ascii_case(target) {
-                    return Some(TargetAddressMatch {
-                        position_index,
-                        word: word.to_string(),
-                        phrase: test_phrase.to_string(),
-                        matched_address: addr.clone(),
-                        chain_family: "bitcoin".to_string(),
-                    });
-                }
-            }
-            if let Some(ref addr) = creds.btc_legacy_address {
-                if addr == target {
-                    return Some(TargetAddressMatch {
-                        position_index,
-                        word: word.to_string(),
-                        phrase: test_phrase.to_string(),
-                        matched_address: addr.clone(),
-                        chain_family: "bitcoin".to_string(),
-                    });
-                }
-            }
-        } else if is_evm {
-            if let Some(ref addr) = creds.evm_address {
-                if addr.eq_ignore_ascii_case(target) {
-                    return Some(TargetAddressMatch {
-                        position_index,
-                        word: word.to_string(),
-                        phrase: test_phrase.to_string(),
-                        matched_address: addr.clone(),
-                        chain_family: "evm".to_string(),
-                    });
-                }
-            }
-        } else if let Some(ref addr) = creds.sol_address {
-            if addr == target {
+    if is_evm {
+        if let Ok(Some(addr)) =
+            crate::core::wallets::derivation::derive_evm_address_only_native(test_phrase)
+        {
+            if addr.eq_ignore_ascii_case(t) {
                 return Some(TargetAddressMatch {
                     position_index,
                     word: word.to_string(),
                     phrase: test_phrase.to_string(),
-                    matched_address: addr.clone(),
-                    chain_family: "solana".to_string(),
+                    matched_address: addr,
+                    chain_family: "evm".to_string(),
                 });
             }
+        }
+    } else if is_btc {
+        if let Ok((segwit, legacy)) =
+            crate::core::wallets::derivation::derive_bitcoin_addresses_only_native(test_phrase)
+        {
+            if let Some(ref addr) = segwit {
+                if addr.eq_ignore_ascii_case(t) {
+                    return Some(TargetAddressMatch {
+                        position_index,
+                        word: word.to_string(),
+                        phrase: test_phrase.to_string(),
+                        matched_address: addr.clone(),
+                        chain_family: "bitcoin".to_string(),
+                    });
+                }
+            }
+            if let Some(ref addr) = legacy {
+                if addr == t {
+                    return Some(TargetAddressMatch {
+                        position_index,
+                        word: word.to_string(),
+                        phrase: test_phrase.to_string(),
+                        matched_address: addr.clone(),
+                        chain_family: "bitcoin".to_string(),
+                    });
+                }
+            }
+        }
+    } else if let Ok(Some(addr)) =
+        crate::core::wallets::derivation::derive_solana_address_only_native(test_phrase)
+    {
+        if addr == t {
+            return Some(TargetAddressMatch {
+                position_index,
+                word: word.to_string(),
+                phrase: test_phrase.to_string(),
+                matched_address: addr,
+                chain_family: "solana".to_string(),
+            });
         }
     }
     None

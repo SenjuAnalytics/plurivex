@@ -8,7 +8,7 @@ use ripemd::Ripemd160;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
 use sha3::Keccak256;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 type HmacSha512 = Hmac<Sha512>;
 
@@ -256,30 +256,22 @@ pub fn derive_dual_credentials_native(
             })
         }
         "sol_pk" => {
-            let mut decoded = bs58::decode(t)
-                .into_vec()
-                .map_err(|e| format!("Invalid Base58 key: {}", e))?;
-            let mut raw32: [u8; 32] = if decoded.len() == 64 {
-                let mut buf = [0u8; 32];
-                buf.copy_from_slice(&decoded[0..32]);
-                buf
-            } else if decoded.len() == 32 {
-                let mut buf = [0u8; 32];
-                buf.copy_from_slice(&decoded);
-                buf
-            } else {
+            let decoded = Zeroizing::new(
+                bs58::decode(t)
+                    .into_vec()
+                    .map_err(|e| format!("Invalid Base58 key: {}", e))?,
+            );
+            if decoded.len() != 32 && decoded.len() != 64 {
                 return Err(format!(
                     "Solana secret key must be 32 or 64 bytes, got {} bytes",
                     decoded.len()
                 ));
-            };
+            }
+            let mut raw32: Zeroizing<[u8; 32]> = Zeroizing::new([0u8; 32]);
+            raw32.copy_from_slice(&decoded[0..32]);
 
             let (sol_address, sol_private_key) = solana_credentials_from_seed(&raw32);
             let (evm_address, evm_private_key) = evm_address_from_private_key(&raw32)?;
-
-            // Scrub intermediate raw key material from RAM
-            decoded.zeroize();
-            raw32.zeroize();
 
             Ok(DualCredentials {
                 evm_address: Some(evm_address),
@@ -293,6 +285,92 @@ pub fn derive_dual_credentials_native(
         }
         _ => Err(format!("Unsupported wallet type: {}", wallet_type)),
     }
+}
+
+/// Derive ONLY EVM public address (BIP-44: m/44'/60'/0'/0/0) directly from mnemonic
+pub fn derive_evm_address_only_native(
+    mnemonic_phrase: &str,
+) -> Result<Option<String>, String> {
+    let t = mnemonic_phrase.trim();
+    let mnemonic = Mnemonic::parse_normalized(t)
+        .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
+    let seed_bytes = Zeroizing::new(mnemonic.to_seed(""));
+    let path: DerivationPath = match "m/44'/60'/0'/0/0".parse() {
+        Ok(p) => p,
+        Err(_) => return Ok(None),
+    };
+    match XPrv::derive_from_path(&*seed_bytes, &path) {
+        Ok(xprv) => {
+            let pk_bytes: Zeroizing<[u8; 32]> =
+                Zeroizing::new(xprv.private_key().to_bytes().into());
+            let signing_key = match SigningKey::from_bytes((&*pk_bytes).into()) {
+                Ok(k) => k,
+                Err(_) => return Err("Invalid secp256k1 key".into()),
+            };
+            let verifying_key = signing_key.verifying_key();
+            let uncompressed = verifying_key.to_encoded_point(false);
+            Ok(Some(evm_address_from_public_key(uncompressed.as_bytes())))
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// Derive ONLY Solana public address (SLIP-0010: m/44'/501'/0'/0') directly from mnemonic
+pub fn derive_solana_address_only_native(
+    mnemonic_phrase: &str,
+) -> Result<Option<String>, String> {
+    let t = mnemonic_phrase.trim();
+    let mnemonic = Mnemonic::parse_normalized(t)
+        .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
+    let seed_bytes = Zeroizing::new(mnemonic.to_seed(""));
+    let sol_slip10_path = [44 | 0x80000000, 501 | 0x80000000, 0x80000000, 0x80000000];
+    let sol_seed_32: Zeroizing<[u8; 32]> =
+        Zeroizing::new(slip10_derive_ed25519(&*seed_bytes, &sol_slip10_path));
+    let signing_key = EdSigningKey::from_bytes(&sol_seed_32);
+    let verifying_key = signing_key.verifying_key();
+    Ok(Some(bs58::encode(verifying_key.as_bytes()).into_string()))
+}
+
+/// Derive ONLY Bitcoin public addresses (Native SegWit BIP-84 & Legacy BIP-44) directly from mnemonic
+pub fn derive_bitcoin_addresses_only_native(
+    mnemonic_phrase: &str,
+) -> Result<(Option<String>, Option<String>), String> {
+    let t = mnemonic_phrase.trim();
+    let mnemonic = Mnemonic::parse_normalized(t)
+        .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
+    let seed_bytes = Zeroizing::new(mnemonic.to_seed(""));
+
+    let btc_address = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
+        Ok(p) => match XPrv::derive_from_path(&*seed_bytes, &p) {
+            Ok(x) => {
+                let pk: Zeroizing<[u8; 32]> =
+                    Zeroizing::new(x.private_key().to_bytes().into());
+                match bitcoin_credentials_from_private_key(&pk) {
+                    Ok((addr, _, _)) => Some(addr),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
+        Ok(p) => match XPrv::derive_from_path(&*seed_bytes, &p) {
+            Ok(x) => {
+                let pk: Zeroizing<[u8; 32]> =
+                    Zeroizing::new(x.private_key().to_bytes().into());
+                match bitcoin_credentials_from_private_key(&pk) {
+                    Ok((_, leg, _)) => Some(leg),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    Ok((btc_address, btc_legacy_address))
 }
 
 /// Zero-RAM-leakage: Derive only public addresses without ever creating private key strings in memory.
