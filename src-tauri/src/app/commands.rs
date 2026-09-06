@@ -642,6 +642,248 @@ pub fn get_solana_address_sealed(
     res
 }
 
+fn get_wallet_secret_and_type(
+    app: &tauri::AppHandle,
+    wallet_id: i64,
+) -> Result<(String, String), String> {
+    let path = crate::core::vault::repository::get_db_path(app)?;
+    if !path.exists() {
+        return Err(format!("Vault database not found at {}", path.display()));
+    }
+    let conn = rusqlite::Connection::open(&path).map_err(|e| e.to_string())?;
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(5000));
+    conn.query_row(
+        "SELECT encrypted_secret, type FROM wallets WHERE id = ?1",
+        rusqlite::params![wallet_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .map_err(|e| format!("Wallet ID {} not found in vault database: {}", wallet_id, e))
+}
+
+#[tauri::command]
+pub async fn vault_session_unlock(
+    app: tauri::AppHandle,
+    password: String,
+    timeout_seconds: Option<u64>,
+) -> Result<String, String> {
+    let mut password = zeroize::Zeroizing::new(password);
+
+    // Verify against database verification token if DB exists
+    if let Ok(path) = crate::core::vault::repository::get_db_path(&app) {
+        if path.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&path) {
+                let _ = conn.busy_timeout(std::time::Duration::from_millis(3000));
+                let token_res: Result<String, _> = conn.query_row(
+                    "SELECT value FROM meta WHERE key = 'verification'",
+                    [],
+                    |row| row.get(0),
+                );
+                if let Ok(token) = token_res {
+                    if !crate::core::security::crypto::verify_password(&token, &password) {
+                        return Err("Invalid master password. Verification failed.".to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let session_token = crate::core::security::session::get_session_manager()
+        .unlock(password.as_str().to_string(), timeout_seconds);
+    crate::core::security::memory::secure_zero_string(&mut password);
+    Ok(session_token)
+}
+
+#[tauri::command]
+pub fn vault_session_lock() -> Result<(), String> {
+    crate::core::security::session::get_session_manager().lock();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn vault_session_status(session_token: String) -> Result<bool, String> {
+    Ok(crate::core::security::session::get_session_manager().is_authenticated(&session_token))
+}
+
+#[tauri::command]
+pub async fn vault_reveal_secret_scoped(
+    app: tauri::AppHandle,
+    wallet_id: i64,
+    session_token: String,
+) -> Result<String, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+    let (encrypted_secret, _) = get_wallet_secret_and_type(&app, wallet_id)?;
+    let secret = crate::core::security::crypto::decrypt_vault(&encrypted_secret, &master_key);
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+    secret
+}
+
+#[tauri::command]
+pub async fn vault_encrypt_with_session(
+    session_token: String,
+    plaintext: String,
+) -> Result<String, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+    let res = crate::core::security::crypto::encrypt_vault(&plaintext, &master_key);
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+    res
+}
+
+#[tauri::command]
+pub async fn vault_encrypt_batch_with_session(
+    session_token: String,
+    plaintexts: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+    let res = crate::core::security::crypto::encrypt_vault_batch(&plaintexts, &master_key);
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+    res
+}
+
+#[tauri::command]
+pub async fn sign_evm_transfer_scoped(
+    app: tauri::AppHandle,
+    wallet_id: i64,
+    session_token: String,
+    tx: EvmTransferPayload,
+) -> Result<EvmSignResult, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+    let (encrypted_secret, wallet_type) = get_wallet_secret_and_type(&app, wallet_id)?;
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_key)?;
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+
+    let from_address = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type)?;
+    let params = crate::core::wallets::signing::EvmTransferParams {
+        chain_id: tx.chain_id,
+        to_address: &tx.to_address,
+        value_wei_hex: &tx.value_wei_hex,
+        gas_price_wei_hex: &tx.gas_price_wei_hex,
+        gas_limit: tx.gas_limit,
+        nonce: tx.nonce,
+    };
+    let raw_tx = crate::core::wallets::signing::sign_evm_transfer_with_secret(
+        &secret,
+        &wallet_type,
+        &params,
+    )?;
+    Ok(EvmSignResult {
+        raw_tx,
+        from_address,
+    })
+}
+
+#[tauri::command]
+pub async fn sign_solana_transfer_scoped(
+    app: tauri::AppHandle,
+    wallet_id: i64,
+    session_token: String,
+    tx: SolanaTransferPayload,
+) -> Result<crate::core::wallets::solana_signing::SolanaSignResult, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+    let (encrypted_secret, wallet_type) = get_wallet_secret_and_type(&app, wallet_id)?;
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_key)?;
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+
+    let params = crate::core::wallets::solana_signing::SolanaTransferParams {
+        recipient: &tx.recipient,
+        lamports: tx.lamports,
+        recent_blockhash: &tx.recent_blockhash,
+        is_nonce_account: tx.is_nonce_account,
+    };
+    crate::core::wallets::solana_signing::sign_solana_transfer_with_secret(
+        &secret,
+        &wallet_type,
+        &params,
+    )
+}
+
+#[tauri::command]
+pub async fn vault_backfill_addresses_scoped(
+    app: tauri::AppHandle,
+    session_token: String,
+) -> Result<usize, String> {
+    let mut master_key = crate::core::security::session::get_session_manager()
+        .get_master_key(&session_token)?;
+
+    let path = crate::core::vault::repository::get_db_path(&app)?;
+    if !path.exists() {
+        crate::core::security::memory::secure_zero_string(&mut master_key);
+        return Ok(0);
+    }
+
+    let mut conn = rusqlite::Connection::open(&path).map_err(|e| e.to_string())?;
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(5000));
+    let _ = conn.execute_batch(
+        "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;",
+    );
+
+    type WalletRow = (i64, String, String, Option<String>, Option<String>, Option<String>);
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, type, encrypted_secret, address, sol_address, btc_address \
+             FROM wallets \
+             WHERE (type = 'seed' AND (address IS NULL OR sol_address IS NULL OR btc_address IS NULL)) \
+                OR (type = 'pk' AND address IS NULL) \
+                OR (type = 'sol_pk' AND sol_address IS NULL) \
+                OR (address IS NULL AND sol_address IS NULL)",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows: Vec<WalletRow> = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .collect();
+
+    drop(stmt);
+
+    if rows.is_empty() {
+        crate::core::security::memory::secure_zero_string(&mut master_key);
+        return Ok(0);
+    }
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let mut updated_count = 0usize;
+
+    for (id, wtype, encrypted_secret, cur_evm, cur_sol, cur_btc) in rows {
+        if let Ok(secret) = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_key) {
+            if let Ok(derived) = crate::core::wallets::derivation::derive_public_addresses_native(&secret, &wtype) {
+                let new_evm = derived.evm_address.or(cur_evm.clone());
+                let new_sol = derived.sol_address.or(cur_sol.clone());
+                let new_btc = derived.btc_address.or(cur_btc.clone());
+
+                if new_evm != cur_evm || new_sol != cur_sol || new_btc != cur_btc {
+                    let res = tx.execute(
+                        "UPDATE wallets SET address = ?1, sol_address = ?2, btc_address = ?3 WHERE id = ?4",
+                        rusqlite::params![new_evm, new_sol, new_btc, id],
+                    );
+                    if res.is_ok() {
+                        updated_count += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    crate::core::security::memory::secure_zero_string(&mut master_key);
+    Ok(updated_count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -754,6 +996,68 @@ mod tests {
         // Test Solana address derivation sealed
         let derived_sol_addr = get_solana_address_sealed(encrypted, password.to_string(), "seed".to_string()).unwrap();
         assert_eq!(derived_sol_addr, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+    }
+
+    #[test]
+    fn test_scoped_evm_and_solana_signing_logic() {
+        let sm = crate::core::security::session::get_session_manager();
+        let password = "TestMasterPassword!999";
+        let token = sm.unlock(password.to_string(), None);
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let encrypted = crate::core::security::crypto::encrypt_vault(mnemonic, password).unwrap();
+
+        // 1. Verify decrypting via session token yields valid secret
+        let master_key = sm.get_master_key(&token).unwrap();
+        let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted, &master_key).unwrap();
+        assert_eq!(&*secret, mnemonic);
+
+        // 2. EVM Signing with secret
+        let evm_tx = EvmTransferPayload {
+            chain_id: 1,
+            to_address: "0x0000000000000000000000000000000000000001".to_string(),
+            value_wei_hex: "0x01".to_string(),
+            gas_price_wei_hex: "0x01".to_string(),
+            gas_limit: 21000,
+            nonce: 0,
+        };
+        let from_address = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, "seed").unwrap();
+        assert_eq!(from_address.to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
+
+        let params = crate::core::wallets::signing::EvmTransferParams {
+            chain_id: evm_tx.chain_id,
+            to_address: &evm_tx.to_address,
+            value_wei_hex: &evm_tx.value_wei_hex,
+            gas_price_wei_hex: &evm_tx.gas_price_wei_hex,
+            gas_limit: evm_tx.gas_limit,
+            nonce: evm_tx.nonce,
+        };
+        let raw_tx = crate::core::wallets::signing::sign_evm_transfer_with_secret(
+            &secret,
+            "seed",
+            &params,
+        ).unwrap();
+        assert!(!raw_tx.is_empty());
+
+        // 3. Solana Signing with secret
+        let sol_tx = SolanaTransferPayload {
+            recipient: "11111111111111111111111111111112".to_string(),
+            lamports: 1_000_000,
+            recent_blockhash: "EkSnNWid2cvwEVnPx9aZaWBrespocAcjwn4SXSpMmMQx".to_string(),
+            is_nonce_account: false,
+        };
+        let sol_params = crate::core::wallets::solana_signing::SolanaTransferParams {
+            recipient: &sol_tx.recipient,
+            lamports: sol_tx.lamports,
+            recent_blockhash: &sol_tx.recent_blockhash,
+            is_nonce_account: sol_tx.is_nonce_account,
+        };
+        let sol_res = crate::core::wallets::solana_signing::sign_solana_transfer_with_secret(
+            &secret,
+            "seed",
+            &sol_params,
+        ).unwrap();
+        assert_eq!(sol_res.from_address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+        assert!(!sol_res.raw_tx_base64.is_empty());
     }
 
     #[test]

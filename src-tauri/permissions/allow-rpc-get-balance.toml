@@ -25,12 +25,14 @@ commands.allow = ["broadcast_raw_tx", "broadcast_solana_tx"]
 
 [[permission]]
 identifier = "allow-native-signing"
-description = "Derive addresses and sign transactions natively using sealed vault credentials (no network)"
+description = "Derive addresses and sign transactions natively using sealed or scoped vault credentials (no network)"
 commands.allow = [
   "sign_evm_transfer_sealed",
   "get_evm_address_sealed",
   "sign_solana_transfer_sealed",
-  "get_solana_address_sealed"
+  "get_solana_address_sealed",
+  "sign_evm_transfer_scoped",
+  "sign_solana_transfer_scoped"
 ]
 
 [[permission]]
@@ -56,7 +58,13 @@ commands.allow = [
   "vault_encrypt_batch",
   "vault_decrypt",
   "vault_create_token",
-  "vault_verify_token"
+  "vault_verify_token",
+  "vault_session_unlock",
+  "vault_session_lock",
+  "vault_session_status",
+  "vault_encrypt_with_session",
+  "vault_encrypt_batch_with_session",
+  "vault_reveal_secret_scoped"
 ]
 
 [[permission]]
@@ -69,7 +77,8 @@ commands.allow = [
   "vault_derive_public_only_batch",
   "vault_validate_mnemonic",
   "vault_repair_mnemonic",
-  "vault_extract_credentials"
+  "vault_extract_credentials",
+  "vault_backfill_addresses_scoped"
 ]
 
 [[permission]]

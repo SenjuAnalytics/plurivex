@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import {
@@ -17,7 +18,7 @@ import {
   hasFundsForWallet,
   totalBalanceForWallet,
 } from "../../lib/chains";
-import { encrypt, encryptBatch, decrypt, verifyPassword } from "../../lib/crypto";
+import { verifyPassword } from "../../lib/crypto";
 import { walletFingerprint } from "../../lib/fingerprint";
 import { smartNormalizeInputNative } from "../../lib/extract";
 import {
@@ -38,7 +39,7 @@ export interface ExportOptions {
 
 interface UseWalletOperationsProps {
   toast: (text: string, type?: ToastType) => void;
-  masterPw: string;
+  sessionToken: string;
   setSelectedId: React.Dispatch<React.SetStateAction<number | null>>;
   setSelectedSweepIds: React.Dispatch<React.SetStateAction<Set<number>>>;
   scanWallets?: (targets: WalletView[]) => Promise<{ funded: number; errors: number }>;
@@ -46,7 +47,7 @@ interface UseWalletOperationsProps {
 
 export function useWalletOperations({
   toast,
-  masterPw,
+  sessionToken,
   setSelectedId,
   setSelectedSweepIds,
   scanWallets,
@@ -187,10 +188,10 @@ export function useWalletOperations({
 
     if (itemsToProcess.length > 0) {
       try {
-        const encryptedBlobs = await encryptBatch(
-          itemsToProcess.map((it) => it.line),
-          masterPw
-        );
+        const encryptedBlobs = await invoke<string[]>("vault_encrypt_batch_with_session", {
+          sessionToken,
+          plaintexts: itemsToProcess.map((it) => it.line),
+        });
         for (let j = 0; j < itemsToProcess.length; j++) {
           batchToInsert.push({
             type: itemsToProcess[j].walletType,
@@ -204,7 +205,10 @@ export function useWalletOperations({
         }
       } catch (err) {
         for (const it of itemsToProcess) {
-          const enc = await encrypt(it.line, masterPw);
+          const enc = await invoke<string>("vault_encrypt_with_session", {
+            sessionToken,
+            plaintext: it.line,
+          });
           batchToInsert.push({
             type: it.walletType,
             encryptedSecret: enc,
@@ -261,8 +265,6 @@ export function useWalletOperations({
     const token = await getVerificationToken();
     if (token) {
       ok = await verifyPassword(token, password);
-    } else if (masterPw) {
-      ok = password === masterPw;
     }
 
     if (!ok) {
@@ -326,7 +328,7 @@ export function useWalletOperations({
           let secret = "";
           let creds: DualCredentials | null = null;
           try {
-            secret = (await decrypt(w.encryptedSecret, masterPw)) ?? "";
+            secret = (await invoke<string>("vault_reveal_secret_scoped", { walletId: w.id, sessionToken })) ?? "";
             creds = await deriveDualCredentialsNative(secret, w.type);
           } catch {}
           const nativeBals = Object.entries(w.balances)
@@ -358,7 +360,7 @@ export function useWalletOperations({
 
         if (options.filter !== "public_only") {
           try {
-            const secret = await decrypt(w.encryptedSecret, masterPw);
+            const secret = await invoke<string>("vault_reveal_secret_scoped", { walletId: w.id, sessionToken });
             const creds = secret ? await deriveDualCredentialsNative(secret, w.type) : null;
             if (w.type === "seed") {
               lines.push(`  • Mnemonic Seed:   ${secret}`);

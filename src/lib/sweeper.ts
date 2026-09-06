@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
-import type { WalletType } from "./types";
 import { shortAddr } from "./wallet";
+
+export interface SolanaAccountDetails {
+  exists?: boolean;
+  owner?: string;
+  account_type?: string;
+  authority?: string | null;
+  is_system_program?: boolean;
+}
 
 export interface SweepChainConfig {
   key: string;
@@ -237,9 +244,7 @@ export interface SweepTxResult {
 
 export async function executeSweepSingle(
   walletId: number,
-  encryptedSecret: string,
-  masterPw: string,
-  walletType: WalletType,
+  sessionToken: string,
   chainKey: string,
   recipientAddress: string,
   customGasPriceGwei?: number,
@@ -250,30 +255,13 @@ export async function executeSweepSingle(
   // 1. Solana Sweep Execution
   if (chainKey === "sol") {
     try {
-      let fromAddress = senderAddress;
-      if (!fromAddress) {
-        try {
-          fromAddress = await invoke<string>("get_solana_address_sealed", {
-            encryptedSecret,
-            masterPw,
-            walletType,
-          });
-        } catch {
-          return {
-            walletId,
-            address: recipientAddress,
-            success: false,
-            error: "Invalid Solana sealed secret or master password",
-          };
-        }
-      }
-
+      const fromAddress = senderAddress;
       if (!fromAddress) {
         return {
           walletId,
           address: recipientAddress,
           success: false,
-          error: "Unable to determine Solana sender address",
+          error: "Sender address required for Solana sweep",
         };
       }
 
@@ -291,42 +279,19 @@ export async function executeSweepSingle(
           walletId,
           address: fromAddress,
           success: false,
-          error: "Insufficient SOL for network transaction fee (0.000005 SOL)",
+          error: `Insufficient balance for fee (Balance: ${lamports} lamports <= Fee: ${feeLamports} lamports)`,
         };
       }
 
-      const netLamports = lamports - feeLamports;
-      const lamportsToSend = netLamports.toString();
+      const lamportsToSend = lamports - feeLamports;
 
-      let accountDetails: {
-        exists?: boolean;
-        owner?: string;
-        account_type?: string;
-        authority?: string | null;
-        is_system_program?: boolean;
-      } | null = null;
-      try {
-        accountDetails = await invoke<{
-          exists?: boolean;
-          owner?: string;
-          account_type?: string;
-          authority?: string | null;
-          is_system_program?: boolean;
-        }>("get_solana_account_details", { address: fromAddress });
-      } catch {
-        /* proceed if diagnostic not available */
-      }
+      // Check account details to prevent ATA/Nonce traps
+      const accountDetails = await invoke<SolanaAccountDetails | null>("get_solana_account_details", {
+        address: fromAddress,
+      });
 
-      if (accountDetails && !accountDetails.is_system_program) {
-        if (accountDetails.account_type === "custom_program") {
-          return {
-            walletId,
-            address: fromAddress,
-            success: false,
-            error: `Akun ini dikelola oleh Smart Contract (${shortAddr(accountDetails.owner || "")}). Hanya program tersebut yang berwenang mendebit dana (transfer native standar ditolak konsensus Solana).`,
-          };
-        }
-        if (accountDetails.account_type === "token_account") {
+      if (accountDetails?.account_type === "token_account") {
+        if (lamports <= 2_500_000n) {
           return {
             walletId,
             address: fromAddress,
@@ -348,19 +313,18 @@ export async function executeSweepSingle(
         }
       }
 
-      // Sign transaction offline natively in Rust using sealed vault credentials (Zero-Webview key exposure)
+      // Sign transaction offline natively in Rust using scoped in-memory session (Zero-Webview key exposure)
       interface SolanaSignResult {
         rawTxBase64: string;
         fromAddress: string;
       }
 
-      const signResult = await invoke<SolanaSignResult>("sign_solana_transfer_sealed", {
-        encryptedSecret,
-        masterPw,
-        walletType,
+      const signResult = await invoke<SolanaSignResult>("sign_solana_transfer_scoped", {
+        walletId,
+        sessionToken,
         tx: {
           recipient: recipientAddress.trim(),
-          lamports: lamportsToSend,
+          lamports: lamportsToSend.toString(),
           recentBlockhash,
           isNonceAccount: accountDetails?.account_type === "nonce_account",
         },
@@ -380,7 +344,7 @@ export async function executeSweepSingle(
         rawTxBase64: signResult.rawTxBase64,
       });
 
-      const amountSent = `${(Number(netLamports) / 1e9).toFixed(6)} SOL`;
+      const amountSent = `${(Number(lamportsToSend) / 1e9).toFixed(6)} SOL`;
 
       return {
         walletId,
@@ -401,31 +365,14 @@ export async function executeSweepSingle(
   }
 
   // 2. EVM Sweep Execution
-  // Derivation done natively in Rust using sealed credentials (Zero key exposure in webview memory)
-  let fromAddress = senderAddress;
-  if (!fromAddress) {
-    try {
-      fromAddress = await invoke<string>("get_evm_address_sealed", {
-        encryptedSecret,
-        masterPw,
-        walletType,
-      });
-    } catch {
-      return {
-        walletId,
-        address: recipientAddress,
-        success: false,
-        error: "Invalid wallet type or sealed secret for EVM",
-      };
-    }
-  }
-
+  // Derivation done natively in Rust using scoped credentials (Zero key exposure in webview memory)
+  const fromAddress = senderAddress;
   if (!fromAddress) {
     return {
       walletId,
       address: recipientAddress,
       success: false,
-      error: "Invalid wallet type or sealed secret for EVM",
+      error: "Unable to determine EVM sender address",
     };
   }
 
@@ -455,16 +402,15 @@ export async function executeSweepSingle(
 
     const netAmount = balance.sub(fee);
 
-    // Sign transaction offline natively in Rust using sealed vault credentials (Zero-Webview key exposure)
+    // Sign transaction offline natively in Rust using scoped in-memory session (Zero-Webview key exposure)
     interface EvmSignResult {
       rawTx: string;
       fromAddress: string;
     }
 
-    const signResult = await invoke<EvmSignResult>("sign_evm_transfer_sealed", {
-      encryptedSecret,
-      masterPw,
-      walletType,
+    const signResult = await invoke<EvmSignResult>("sign_evm_transfer_scoped", {
+      walletId,
+      sessionToken,
       tx: {
         chainId: cfg.chainId,
         toAddress: recipientAddress.trim(),

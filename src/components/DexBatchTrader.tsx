@@ -40,7 +40,7 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
             <span className="dex-badge-warning">SIMULATOR PREVIEW</span>
           </div>
           <h3>DEX Batch Trader</h3>
-          <p>Simulation Preview: Execute parallel buys and sells across Uniswap, PancakeSwap, & Raydium (on-chain DEX routing engine in development).</p>
+          <p>Simulation Preview: Simulate parallel buys and sells across Uniswap, PancakeSwap, & Raydium (on-chain DEX routing engine in development).</p>
         </div>
         <div className="dex-mode-pills">
           <button

@@ -49,7 +49,16 @@ pub fn run() {
             app::commands::get_recovery_session_status,
             app::commands::scan_phrase_on_the_fly,
             app::commands::get_token_prices,
-            app::commands::vault_extract_credentials
+            app::commands::vault_extract_credentials,
+            app::commands::vault_session_unlock,
+            app::commands::vault_session_lock,
+            app::commands::vault_session_status,
+            app::commands::sign_evm_transfer_scoped,
+            app::commands::sign_solana_transfer_scoped,
+            app::commands::vault_reveal_secret_scoped,
+            app::commands::vault_encrypt_with_session,
+            app::commands::vault_encrypt_batch_with_session,
+            app::commands::vault_backfill_addresses_scoped
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(

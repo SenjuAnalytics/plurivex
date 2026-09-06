@@ -27,7 +27,7 @@ interface UseAuthVaultProps {
 
 export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps) {
   const [screen, setScreen] = useState<Screen>('loading');
-  const [masterPw, setMasterPw] = useState('');
+  const [sessionToken, setSessionToken] = useState<string>('');
   const [hasPin, setHasPin] = useState(false);
   const [initError, setInitError] = useState('');
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() => {
@@ -58,8 +58,9 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
 
   // 2. Auto-Lock Timer & Inactivity Listener
   const lock = useCallback(() => {
-    setMasterPw('');
+    setSessionToken('');
     setScreen('unlock');
+    invoke('vault_session_lock').catch(() => {});
     invoke('clear_recovery_session', { sessionId: '' }).catch(() => {});
     toast('Vault dikunci demi keamanan', 'info');
   }, [toast]);
@@ -108,7 +109,11 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
       setHasPin(true);
     }
 
-    setMasterPw(pw);
+    const sToken = await invoke<string>('vault_session_unlock', {
+      password: pw,
+      timeoutSeconds: autoLockMinutes * 60,
+    });
+    setSessionToken(sToken);
     await loadWallets();
     setScreen('app');
     toast('Brankas berhasil dibuat & terenkripsi!', 'success');
@@ -120,11 +125,21 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
     if (!token) return false;
     const ok = await verifyPassword(token, pw);
     if (ok) {
-      setMasterPw(pw);
-      await loadWallets();
-      setScreen('app');
-      toast('Brankas berhasil dibuka!', 'success');
-      return true;
+      try {
+        const sToken = await invoke<string>('vault_session_unlock', {
+          password: pw,
+          timeoutSeconds: autoLockMinutes * 60,
+        });
+        setSessionToken(sToken);
+        await loadWallets();
+        setScreen('app');
+        toast('Brankas berhasil dibuka!', 'success');
+        return true;
+      } catch (err) {
+        console.error('Session unlock failed:', err);
+        toast('Gagal membuka sesi vault di sistem', 'error');
+        return false;
+      }
     }
     toast('Kata sandi master salah', 'error');
     return false;
@@ -141,9 +156,14 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
     const ok = await verifyPassword(pinData.pinToken, pin);
     if (ok) {
       try {
-        const decryptedMasterPw = await decrypt(pinData.pinVault, pin);
+        let decryptedMasterPw = await decrypt(pinData.pinVault, pin);
         if (decryptedMasterPw) {
-          setMasterPw(decryptedMasterPw);
+          const sToken = await invoke<string>('vault_session_unlock', {
+            password: decryptedMasterPw,
+            timeoutSeconds: autoLockMinutes * 60,
+          });
+          decryptedMasterPw = ''; // Clean temporary JS variable immediately
+          setSessionToken(sToken);
           await loadWallets();
           setScreen('app');
           toast('Brankas berhasil dibuka via PIN!', 'success');
@@ -160,19 +180,25 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
   // 6. Reset Entire Vault (Forgot Password Flow)
   const resetVault = async () => {
     await resetEntireVault();
-    setMasterPw('');
+    await invoke('vault_session_lock').catch(() => {});
+    setSessionToken('');
     setHasPin(false);
     await loadWallets();
     setScreen('setup');
     toast('Vault telah di-reset. Silakan buat kata sandi baru.', 'info');
   };
 
+  // 7. Scoped Secret Reveal (Only on Explicit User Request)
   const revealSecret = async (id: number): Promise<string | null> => {
     const w = wallets.find((x) => x.id === id);
-    if (!w || !masterPw) return null;
+    if (!w || !sessionToken) return null;
     try {
-      return await decrypt(w.encryptedSecret, masterPw);
-    } catch {
+      return await invoke<string>('vault_reveal_secret_scoped', {
+        walletId: id,
+        sessionToken,
+      });
+    } catch (err) {
+      console.error('Reveal secret error:', err);
       toast('Gagal mendekripsi secret dengan kata sandi', 'error');
       return null;
     }
@@ -181,8 +207,8 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
   return {
     screen,
     setScreen,
-    masterPw,
-    setMasterPw,
+    sessionToken,
+    setSessionToken,
     hasPin,
     initError,
     setInitError,

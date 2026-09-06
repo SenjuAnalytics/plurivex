@@ -929,6 +929,28 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Memperbarui label tombol utama menjadi `Simulate Batch Buy / Sell` dan status eksekusi menjadi `Simulating Orders…`.
     - **Total Pengujian**: **54 unit test** lolos (53 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite build bersih.
 
+22. **🔐 Arsitektur K3 Penuh: In-Memory Vault Session di Rust, Scoped IPC Commands, & Eliminasi Total `masterPw` dari Webview**
+    - **In-Memory Vault Session Manager (`session.rs`)**:
+      - Mengimplementasikan struct `VaultSession` yang menyimpan `session_token` (string hex acak 64-karakter kriptografis) dan `master_key` yang dibungkus dalam `zeroize::Zeroizing<String>`.
+      - Dilengkapi thread-safe `Mutex`, auto-lock inactivity timer (default 15 menit), serta metode `unlock`, `lock`, `is_authenticated`, `get_master_key`, dan `with_master_key`.
+      - Pemanggilan `lock()` mengosongkan sesi aktif, memicu pembersihan zeroize memori instan (`0x00`) via `Drop` RAII, dan secara otomatis membatalkan seluruh sesi recovery yang sedang aktif via `clear_recovery_session("")`.
+      - Unit test komprehensif: validasi token acak, penolakan token salah, auto-lock timeout pada inaktivitas, dan pembersihan memori seketika saat lock.
+    - **Scoped Tauri IPC Commands (`commands.rs`, `lib.rs`, `allow-rpc-get-balance.toml`)**:
+      - `vault_session_unlock`: Memvalidasi master password terhadap token verifikasi di database SQLite lokal, menginisialisasi sesi Rust di RAM, dan mengembalikan `session_token` opaque ke webview.
+      - `vault_session_lock` & `vault_session_status`: Mengontrol siklus hidup sesi dari UI tanpa membuka kunci rahasia.
+      - `sign_evm_transfer_scoped` & `sign_solana_transfer_scoped`: Mengambil transaksi berdasarkan `wallet_id` dan `session_token`. Rust mengambil `encrypted_secret` dari SQLite, mendekripsinya langsung di memori backend, dan menandatangani transaksi tanpa pernah membocorkan private key ke webview atau IPC.
+      - `vault_backfill_addresses_scoped`: Melakukan backfill multi-chain address untuk seluruh dompet langsung di dalam backend Rust dalam 1 transaksi SQLite atomic, tanpa roundtrip IPC satu per satu.
+      - `vault_reveal_secret_scoped`: Mengembalikan plaintext secret hanya ketika pengguna secara sadar mengklik tombol "Lihat Kunci Privat / Seed" di UI `WalletDetail`.
+      - `vault_encrypt_with_session` & `vault_encrypt_batch_with_session`: Mengenkripsi dompet baru langsung menggunakan kunci sesi aktif di backend Rust.
+    - **Eliminasi 100% `masterPw` dari Frontend React (`useAuthVault.ts`, `AppContext.tsx`, `useWalletOperations.ts`, `SweeperWorkspace.tsx`, `sweeper.ts`)**:
+      - Webview JavaScript tidak lagi menyimpan `masterPw` di React state, Context, maupun closure.
+      - State otentikasi di frontend sepenuhnya digantikan oleh `sessionToken`.
+      - Pembersihan total: pencarian `masterPw` di seluruh direktori `src/` menghasilkan **0 temuan** (0% exposure).
+    - **Penyempurnaan Salinan DEX Trader (`DexBatchTrader.tsx`)**:
+      - Memperbarui teks deskripsi menjadi *"Simulate parallel buys and sells across Uniswap, PancakeSwap, & Raydium..."*.
+    - **Total Pengujian**: **59 unit test** lolos (58 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite & TypeScript build bersih.
+
+
 
 
 

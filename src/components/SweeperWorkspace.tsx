@@ -32,7 +32,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
     wallets,
     selectedSweepIds,
     selectAllFunded,
-    masterPw,
+    sessionToken,
     scanAll,
     toast,
   } = useApp();
@@ -135,7 +135,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
       toast(isEvmChain ? "Please enter a valid EVM destination address (0x...)" : "Please enter a valid Solana Base58 destination address", "error");
       return;
     }
-    if (!masterPw) {
+    if (!sessionToken) {
       toast("Vault is locked. Please unlock your vault before sweeping.", "error");
       return;
     }
@@ -159,9 +159,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
 
       const res = await executeSweepSingle(
         w.id,
-        w.encryptedSecret,
-        masterPw,
-        w.type,
+        sessionToken,
         chainKey,
         recipient.trim(),
         gasPriceGwei,

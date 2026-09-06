@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { ScanProgress, ToastMessage, ToastType, WalletView } from "../lib/types";
 import { useToastState } from "./hooks/useToastState";
 import { useWalletFilters } from "./hooks/useWalletFilters";
@@ -6,9 +7,6 @@ import { useWalletOperations, type ExportOptions } from "./hooks/useWalletOperat
 import { useWalletScanner } from "./hooks/useWalletScanner";
 import { useAuthVault, type Screen } from "./hooks/useAuthVault";
 import { useTokenPrices } from "./hooks/useTokenPrices";
-import { decrypt } from "../lib/crypto";
-import { derivePublicAddressesNative } from "../lib/wallet";
-import { updateWalletAddresses } from "../lib/db";
 
 export type { ExportOptions };
 
@@ -53,7 +51,7 @@ interface AppContextValue {
   exportWallets: (format: "txt" | "csv") => Promise<void>;
   exportWalletsWithOptions: (options: ExportOptions) => Promise<void>;
   revealSecret: (id: number) => Promise<string | null>;
-  masterPw: string;
+  sessionToken: string;
   autoLockMinutes: number;
   setAutoLockMinutes: (mins: number) => void;
   isAirGapped: boolean;
@@ -74,7 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // 1. Core Wallet State & Operations Hook
   const walletOps = useWalletOperations({
     toast,
-    masterPw: "", // Will be wired dynamically via auth
+    sessionToken: "", // Will be wired dynamically via auth
     setSelectedId: () => {}, // placeholder overwritten below
     setSelectedSweepIds: () => {},
   });
@@ -97,10 +95,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     wallets: walletOps.wallets,
   });
 
-  // Re-wire masterPw & selection setters dynamically
+  // Re-wire sessionToken & selection setters dynamically
   walletOps.importWallets = useWalletOperations({
     toast,
-    masterPw: auth.masterPw,
+    sessionToken: auth.sessionToken,
     setSelectedId: filters.setSelectedId,
     setSelectedSweepIds: filters.setSelectedSweepIds,
     scanWallets: scanner.scanWallets,
@@ -108,58 +106,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   walletOps.resetAllWallets = useWalletOperations({
     toast,
-    masterPw: auth.masterPw,
+    sessionToken: auth.sessionToken,
     setSelectedId: filters.setSelectedId,
     setSelectedSweepIds: filters.setSelectedSweepIds,
   }).resetAllWallets;
 
   walletOps.exportWalletsWithOptions = useWalletOperations({
     toast,
-    masterPw: auth.masterPw,
+    sessionToken: auth.sessionToken,
     setSelectedId: filters.setSelectedId,
     setSelectedSweepIds: filters.setSelectedSweepIds,
   }).exportWalletsWithOptions;
 
   walletOps.exportWallets = useWalletOperations({
     toast,
-    masterPw: auth.masterPw,
+    sessionToken: auth.sessionToken,
     setSelectedId: filters.setSelectedId,
     setSelectedSweepIds: filters.setSelectedSweepIds,
   }).exportWallets;
 
-  // Reactive Multi-Chain Address Backfill
+  // Reactive Multi-Chain Address Backfill (Native Scoped Rust Execution)
   useEffect(() => {
-    if (!auth.masterPw || !walletOps.wallets.length) return;
-    const missing = walletOps.wallets.filter((w) => !w.address || !w.solAddress || (w.type === "seed" && !w.btcAddress));
-    if (missing.length === 0) return;
+    if (!auth.sessionToken || !walletOps.wallets.length) return;
+    const missing = walletOps.wallets.some(
+      (w) =>
+        (w.type === "seed" && (!w.address || !w.solAddress || !w.btcAddress)) ||
+        (w.type === "pk" && !w.address) ||
+        (w.type === "sol_pk" && !w.solAddress) ||
+        (!w.address && !w.solAddress)
+    );
+    if (!missing) return;
 
     let cancelled = false;
     (async () => {
-      let changed = false;
-      for (const w of missing) {
-        if (cancelled) break;
-        try {
-          const sec = await decrypt(w.encryptedSecret, auth.masterPw);
-          if (!sec) continue;
-          const creds = await derivePublicAddressesNative(sec, w.type);
-          const newEvm = creds.evmAddress ?? w.address;
-          const newSol = creds.solAddress ?? w.solAddress;
-          const newBtc = creds.btcAddress ?? w.btcAddress;
-          if (newEvm !== w.address || newSol !== w.solAddress || newBtc !== w.btcAddress) {
-            await updateWalletAddresses(w.id, newEvm, newSol, newBtc);
-            changed = true;
-          }
-        } catch {}
-      }
-      if (changed && !cancelled) {
-        await walletOps.loadWallets();
+      try {
+        const updatedCount = await invoke<number>("vault_backfill_addresses_scoped", {
+          sessionToken: auth.sessionToken,
+        });
+        if (updatedCount > 0 && !cancelled) {
+          await walletOps.loadWallets();
+        }
+      } catch (err) {
+        console.warn("Scoped backfill warning:", err);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [auth.masterPw, walletOps.wallets, walletOps.loadWallets]);
+  }, [auth.sessionToken, walletOps.wallets, walletOps.loadWallets]);
 
   const value: AppContextValue = {
     screen: auth.screen,
@@ -199,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     exportWallets: walletOps.exportWallets,
     exportWalletsWithOptions: walletOps.exportWalletsWithOptions,
     revealSecret: auth.revealSecret,
-    masterPw: auth.masterPw,
+    sessionToken: auth.sessionToken,
     autoLockMinutes: auth.autoLockMinutes,
     setAutoLockMinutes: auth.setAutoLockMinutes,
     isAirGapped: scanner.isAirGapped,
