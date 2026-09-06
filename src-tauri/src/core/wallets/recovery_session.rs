@@ -216,10 +216,14 @@ pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
 
 pub fn clear_recovery_session(session_id: &str) -> Result<bool, String> {
     let mut active = safe_lock(&ACTIVE_SESSION_ID);
-    if active.as_deref() == Some(session_id) || active.is_some() {
-        CANCEL_FLAG.store(true, Ordering::SeqCst);
-        *active = None;
+    let is_match = active.as_deref() == Some(session_id);
+    if !(is_match || session_id.is_empty()) {
+        return Ok(false); // Stale session id from previous session; do not touch active session!
     }
+    CANCEL_FLAG.store(true, Ordering::SeqCst);
+    SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
+    *active = None;
+    drop(active);
     clear_session_secrets();
     Ok(true)
 }
@@ -495,15 +499,14 @@ pub fn run_dual_word_session_worker(
             }
         }
 
-        // Deliver-then-Wipe (R1):
-        // On cancellation, clear all secrets immediately.
-        // On normal completion, only zeroize raw input phrase, preserving cached solutions and target match for frontend polling.
-        if CANCEL_FLAG.load(Ordering::SeqCst) {
-            clear_session_secrets();
-        } else if !PAUSE_FLAG.load(Ordering::SeqCst)
-            && SESSION_GENERATION.load(Ordering::Relaxed) == generation
-        {
-            clear_active_phrase_secret();
+        // Deliver-then-Wipe (R1) with Generation Protection (K6/T1):
+        // Only the worker matching the active generation is allowed to touch memory state
+        if SESSION_GENERATION.load(Ordering::SeqCst) == generation {
+            if CANCEL_FLAG.load(Ordering::SeqCst) {
+                clear_session_secrets();
+            } else if !PAUSE_FLAG.load(Ordering::SeqCst) {
+                clear_active_phrase_secret();
+            }
         }
     });
 }
@@ -512,8 +515,11 @@ pub fn run_dual_word_session_worker(
 mod tests {
     use super::*;
 
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_in_memory_recovery_session_lifecycle() {
+        let _guard = safe_lock(&TEST_LOCK);
         let phrase =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ? ?"
                 .to_string();
@@ -540,22 +546,29 @@ mod tests {
 
     #[test]
     fn test_deliver_then_wipe_preserves_solutions_on_fast_complete() {
+        let _guard = safe_lock(&TEST_LOCK);
         // 1 missing word = 2048 combinations, completes quickly
         let phrase =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?"
                 .to_string();
         let res = start_in_memory_session(phrase, None, "single_word".to_string()).unwrap();
 
-        // Give worker a brief moment to complete all 2048 combinations
-        std::thread::sleep(std::time::Duration::from_millis(150));
-
-        let status = get_live_session_status(&res.session_id).unwrap();
-        assert_eq!(status.status, "completed");
-        // Verify solutions are preserved for frontend polling
-        assert!(status.solutions_count > 0);
-        assert!(!status.recent_solutions.is_empty());
-        // Verify raw input phrase was wiped from RAM
-        assert!(safe_lock(&ACTIVE_RAW_PHRASE).is_none());
+        // Deterministic polling with timeout instead of fixed sleep
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let status = get_live_session_status(&res.session_id).unwrap();
+            if status.status == "completed" {
+                assert!(status.solutions_count > 0);
+                assert!(!status.recent_solutions.is_empty());
+                assert!(safe_lock(&ACTIVE_RAW_PHRASE).is_none());
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Worker timeout: tidak selesai dalam 5s"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
 
         // Now verify frontend explicit cleanup wipes everything
         let clear_res = clear_recovery_session(&res.session_id).unwrap();
