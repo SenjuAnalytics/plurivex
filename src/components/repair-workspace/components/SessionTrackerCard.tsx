@@ -13,6 +13,7 @@ interface SessionTrackerCardProps {
   onStopScan?: () => void;
   isOnTheFlyScanning?: boolean;
   scanProgressInfo?: { current: number; total: number; funded: number } | null;
+  isSingleWordMissing?: boolean;
 }
 
 export const SessionTrackerCard: React.FC<SessionTrackerCardProps> = ({
@@ -27,6 +28,7 @@ export const SessionTrackerCard: React.FC<SessionTrackerCardProps> = ({
   onStopScan,
   isOnTheFlyScanning = false,
   scanProgressInfo,
+  isSingleWordMissing = false,
 }) => {
   return (
     <div className={`session-tracker-card ${activeSession ? `is-${activeSession.status}` : "is-idle"}`}>
@@ -63,14 +65,23 @@ export const SessionTrackerCard: React.FC<SessionTrackerCardProps> = ({
 
         <div className="session-controls-row">
           {(!activeSession || activeSession.status === "completed" || activeSession.status === "cancelled") && (
-            <button
-              type="button"
-              className="session-btn session-btn-resume"
-              onClick={onStartSession}
-              title="Mulai sesi pencarian brute-force multi-thread di latar belakang dengan auto-checkpoint ke SQLite"
-            >
-              🚀 Mulai Sesi Baru
-            </button>
+            isSingleWordMissing ? (
+              <span
+                className="session-status-badge status-completed"
+                title="Semua 2.048 kandidat telah dianalisis instan secara live di memori"
+              >
+                ✓ Selesai Live (2.048 kata)
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="session-btn session-btn-resume"
+                onClick={onStartSession}
+                title="Mulai sesi pencarian brute-force multi-thread di latar belakang dengan auto-checkpoint ke SQLite"
+              >
+                🚀 Mulai Sesi Baru
+              </button>
+            )
           )}
 
           {activeSession?.status === "running" && (

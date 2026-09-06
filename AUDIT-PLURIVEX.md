@@ -885,6 +885,16 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Menghilangkan bug UI di mana persentase progress sebelumnya melompat melebihi 100%.
       - Menambahkan unit test `test_eleven_words_without_placeholder_completes_2048_combinations`. Total pengujian bertambah menjadi **53 unit test** (52 lintas platform + 1 Windows).
 
+19. **🧹 Eliminasi Total Derivasi Kunci JS `deriveDualCredentials` & Resolusi F13**
+    - **Pembersihan Kriptografi JS (`wallet.ts`, `solana.ts`)**:
+      - Menghapus fungsi warisan `deriveDualCredentials`, `deriveAddress`, `deriveEvmWallet`, `deriveSolanaFromMnemonic`, `deriveSolanaFromHex`, `deriveEvmFromSolanaKey`, dan `deriveSolanaAddress`.
+      - Menghapus dependensi impor `@noble/ed25519`, `Keypair` dari `@solana/web3.js`, dan `ed25519-hd-key` dari pohon bundle derivasi frontend (mengurangi ukuran JS bundle sebesar ~20 kB).
+      - Seluruh derivasi kredensial (EVM, Solana, Bitcoin) di `AppContext.tsx`, `useWalletOperations.ts`, dan `WalletDetail.tsx` dialihkan 100% ke native Rust via `deriveDualCredentialsNative` (`vault_derive_credentials`).
+    - **Resolusi F13 (UX 1-Kata Hilang & Rust API Clean-up)**:
+      - Di `SessionTrackerCard.tsx` & `RepairWorkspace.tsx`: Menyembunyikan tombol *"Mulai Sesi Baru"* jika `isSingleWordMissing` bernilai true, menggantikannya dengan badge informatif bahwa 2.048 kombinasi telah dianalisis instan secara live di memori.
+      - Di `commands.rs` & `recovery_session.rs`: Menghapus parameter `search_type` yang usang/tidak digunakan dari signature `start_recovery_session` dan `start_in_memory_session`.
+
+
 
 
 

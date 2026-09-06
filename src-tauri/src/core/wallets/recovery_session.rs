@@ -51,7 +51,6 @@ pub fn get_current_active_session_id() -> Option<String> {
 pub fn start_in_memory_session(
     phrase: String,
     target_address: Option<String>,
-    _search_type: String,
 ) -> Result<RecoverySessionStatusResponse, String> {
     // Purge any lingering secrets/solutions from previous sessions (Z5)
     clear_session_secrets();
@@ -539,7 +538,7 @@ mod tests {
         let phrase =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ? ?"
                 .to_string();
-        let res = start_in_memory_session(phrase, None, "dual_word".to_string()).unwrap();
+        let res = start_in_memory_session(phrase, None).unwrap();
         assert_eq!(res.status, "running");
         assert_eq!(res.total_combinations, 4_194_304);
 
@@ -568,7 +567,7 @@ mod tests {
         let phrase =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?"
                 .to_string();
-        let res = start_in_memory_session(phrase, None, "single_word".to_string()).unwrap();
+        let res = start_in_memory_session(phrase, None).unwrap();
 
         // Deterministic polling with timeout instead of fixed sleep
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -601,7 +600,7 @@ mod tests {
         let phrase =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
                 .to_string();
-        let res = start_in_memory_session(phrase, None, "auto".to_string()).unwrap();
+        let res = start_in_memory_session(phrase, None).unwrap();
         assert_eq!(res.total_combinations, 2048);
 
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);

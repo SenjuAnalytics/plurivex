@@ -292,12 +292,10 @@ pub async fn vault_extract_credentials(text: String) -> Result<Vec<String>, Stri
 pub async fn start_recovery_session(
     phrase: String,
     target_address: Option<String>,
-    search_type: String,
 ) -> Result<crate::core::wallets::recovery_session::RecoverySessionStatusResponse, String> {
     crate::core::wallets::recovery_session::start_in_memory_session(
         phrase,
         target_address,
-        search_type,
     )
 }
 

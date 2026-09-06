@@ -4,19 +4,11 @@ import {
   isBase58Line,
   isSolanaKeyStr,
   normalizeSolSecret,
-  deriveSolanaAddress,
-  deriveSolanaFromMnemonic,
-  deriveSolanaFromHex,
-  deriveEvmFromSolanaKey,
 } from "./solana";
 import type { WalletType } from "./types";
 
 export {
-  deriveSolanaAddress,
   isSolanaKeyStr,
-  deriveSolanaFromMnemonic,
-  deriveSolanaFromHex,
-  deriveEvmFromSolanaKey,
 } from "./solana";
 
 const MNEMONIC_LENGTHS = [12, 15, 18, 21, 24];
@@ -180,36 +172,6 @@ export function canonicalKey(text: string): string {
   return "seed:" + words.map((w) => w.toLowerCase()).join(" ");
 }
 
-export function deriveAddress(secret: string, type: WalletType): string | null {
-  try {
-    if (type === "pk") {
-      const norm = secret.trim().replace(/^0x/i, "0x");
-      return new ethers.Wallet(norm.startsWith("0x") ? norm : "0x" + norm).address;
-    }
-    if (type === "seed") {
-      return ethers.Wallet.fromMnemonic(secret.trim()).address;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-export function deriveEvmWallet(secret: string, type: WalletType): ethers.Wallet | null {
-  try {
-    if (type === "pk") {
-      const norm = secret.trim().replace(/^0x/i, "");
-      return new ethers.Wallet("0x" + norm);
-    }
-    if (type === "seed") {
-      return ethers.Wallet.fromMnemonic(secret.trim());
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export interface DualCredentials {
   evmAddress: string | null;
   solAddress: string | null;
@@ -224,92 +186,22 @@ export async function deriveDualCredentialsNative(
   secret: string,
   type: WalletType
 ): Promise<DualCredentials> {
-  try {
-    return await invoke<DualCredentials>("vault_derive_credentials", {
-      secret,
-      walletType: type,
-    });
-  } catch (err) {
-    console.warn("Native derivation failed, falling back:", err);
-    return deriveDualCredentials(secret, type);
-  }
+  return await invoke<DualCredentials>("vault_derive_credentials", {
+    secret,
+    walletType: type,
+  });
 }
 
 export async function deriveDualCredentialsBatchNative(
   secrets: string[],
   type: WalletType
 ): Promise<(DualCredentials | null)[]> {
-  try {
-    return await invoke<(DualCredentials | null)[]>("vault_derive_credentials_batch", {
-      secrets,
-      walletType: type,
-    });
-  } catch (err) {
-    console.warn("Native batch derivation failed, falling back:", err);
-    return secrets.map((s) => deriveDualCredentials(s, type));
-  }
+  return await invoke<(DualCredentials | null)[]>("vault_derive_credentials_batch", {
+    secrets,
+    walletType: type,
+  });
 }
 
-export function deriveDualCredentials(secret: string, type: WalletType): DualCredentials {
-  const t = secret.trim();
-  let evmAddress: string | null = null;
-  let solAddress: string | null = null;
-  let evmPrivateKey: string | null = null;
-  let solPrivateKey: string | null = null;
-
-  try {
-    if (type === "seed") {
-      // EVM Derivation
-      try {
-        const w = ethers.Wallet.fromMnemonic(t);
-        evmAddress = w.address;
-        evmPrivateKey = w.privateKey;
-      } catch {}
-
-      // Solana Derivation from Mnemonic
-      const sol = deriveSolanaFromMnemonic(t);
-      if (sol) {
-        solAddress = sol.address;
-        solPrivateKey = sol.privateKeyBase58;
-      }
-    } else if (type === "pk") {
-      // EVM Derivation
-      try {
-        const norm = t.replace(/^0x/i, "");
-        const w = new ethers.Wallet("0x" + norm);
-        evmAddress = w.address;
-        evmPrivateKey = "0x" + norm;
-      } catch {}
-
-      // Solana Derivation from 32-byte EVM PK
-      const sol = deriveSolanaFromHex(t);
-      if (sol) {
-        solAddress = sol.address;
-        solPrivateKey = sol.privateKeyBase58;
-      }
-    } else if (type === "sol_pk") {
-      // Solana Key
-      solAddress = deriveSolanaAddress(t);
-      solPrivateKey = t;
-
-      // EVM Derivation from Solana Key bytes
-      const evm = deriveEvmFromSolanaKey(t);
-      if (evm) {
-        evmAddress = evm.address;
-        evmPrivateKey = evm.privateKeyHex;
-      }
-    }
-  } catch (e) {
-    console.warn("Dual derivation error:", e);
-  }
-
-  return {
-    evmAddress,
-    solAddress,
-    evmPrivateKey,
-    solPrivateKey,
-  };
-}
 
 
 export function shortAddr(a: string) {

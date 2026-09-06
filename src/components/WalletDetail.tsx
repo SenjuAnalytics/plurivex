@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext";
 import { copySensitiveToClipboard } from "../lib/security";
 import { balanceAmount, chainsForWallet } from "../lib/chains";
 import type { WalletView } from "../lib/types";
-import { deriveDualCredentials, walletHasScanTarget } from "../lib/wallet";
+import { deriveDualCredentialsNative, walletHasScanTarget, type DualCredentials } from "../lib/wallet";
 import { SweeperWorkspace } from "./SweeperWorkspace";
 import { DexBatchTrader } from "./DexBatchTrader";
 import { WalletActivityExplorer } from "./WalletActivityExplorer";
@@ -24,6 +24,7 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
   const [solAccount, setSolAccount] = useState<SolanaAccountDetails | null>(null);
   const [loadingSolAccount, setLoadingSolAccount] = useState(false);
   const [solAccountError, setSolAccountError] = useState<string | null>(null);
+  const [dualCreds, setDualCreds] = useState<DualCredentials | null>(null);
 
   useEffect(() => {
     setRevealed(false);
@@ -69,9 +70,22 @@ export function WalletDetail({ wallet }: { wallet: WalletView }) {
     }, 15000);
   };
 
-  const dualCreds = useMemo(() => {
-    if (!secret) return null;
-    return deriveDualCredentials(secret, wallet.type);
+  useEffect(() => {
+    let cancelled = false;
+    if (!secret) {
+      setDualCreds(null);
+      return;
+    }
+    deriveDualCredentialsNative(secret, wallet.type)
+      .then((creds) => {
+        if (!cancelled) setDualCreds(creds);
+      })
+      .catch(() => {
+        if (!cancelled) setDualCreds(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [secret, wallet.type]);
 
   const evmAddr = wallet.address || dualCreds?.evmAddress || null;

@@ -22,7 +22,6 @@ import { walletFingerprint } from "../../lib/fingerprint";
 import { smartNormalizeInputNative } from "../../lib/extract";
 import {
   classify,
-  deriveDualCredentials,
   deriveDualCredentialsNative,
   deriveDualCredentialsBatchNative,
   walletHasScanTarget,
@@ -149,7 +148,7 @@ export function useWalletOperations({
         continue;
       }
 
-      const derived = derivedList[i] || deriveDualCredentials(line, walletType);
+      const derived = derivedList[i] || (await deriveDualCredentialsNative(line, walletType));
       const address = derived.evmAddress ?? null;
       const solAddress = derived.solAddress ?? null;
       const btcAddress = derived.btcAddress ?? null;

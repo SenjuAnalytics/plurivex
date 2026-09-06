@@ -197,7 +197,6 @@ export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
       const rec = await invoke<SessionStats>("start_recovery_session", {
         phrase: phrase.trim(),
         targetAddress: targetAddress.trim() || null,
-        searchType: "dual_word",
       });
       setActiveSession({
         sessionId: rec.sessionId,
@@ -462,6 +461,7 @@ export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
           onStopScan={stopScan}
           isOnTheFlyScanning={isOnTheFlyScanning}
           scanProgressInfo={scanProgressInfo}
+          isSingleWordMissing={Boolean(analysis?.isSingleWordMissing)}
         />
       )}
 
