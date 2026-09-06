@@ -21,11 +21,14 @@ pub fn sign_evm_transaction(
     private_key: &Zeroizing<[u8; 32]>,
     params: &EvmTxParams<'_>,
 ) -> Result<String, String> {
-    if params.to.len() != 20 && !params.to.is_empty() {
+    if params.to.len() != 20 {
         return Err(format!(
             "Invalid recipient address length: expected 20 bytes, got {}",
             params.to.len()
         ));
+    }
+    if params.to == [0u8; 20] {
+        return Err("Recipient address cannot be the zero address (0x000...000)".to_string());
     }
 
     // 1. Construct EIP-155 unsigned payload:
@@ -94,12 +97,22 @@ pub fn parse_hex_or_dec_bytes(s: &str) -> Result<Vec<u8>, String> {
         };
         hex::decode(&clean).map_err(|e| format!("Invalid hex string: {}", e))
     } else {
-        // Decimal string (e.g. 1000000000)
+        // Decimal string (e.g. 1000000000 or 20000000000000000000)
         let val: u128 = t
             .parse()
             .map_err(|e| format!("Failed to parse decimal number: {}", e))?;
-        Ok(to_be_bytes_trimmed(val as u64))
+        let full = val.to_be_bytes();
+        let trimmed = trim_leading_zeroes(&full);
+        Ok(trimmed.to_vec())
     }
+}
+
+/// Derive checksummed EVM address directly from secret (seed phrase or raw hex private key).
+/// The private key buffer is held in Zeroizing and wiped immediately.
+pub fn derive_evm_address_from_secret(secret: &str, wallet_type: &str) -> Result<String, String> {
+    let pk = extract_evm_private_key(secret, wallet_type)?;
+    let (addr, _) = crate::core::wallets::derivation::evm_address_from_private_key(&pk)?;
+    Ok(addr)
 }
 
 /// Helper to parse a 20-byte Ethereum address from a hex string
@@ -209,8 +222,8 @@ mod tests {
         // Value: 1000000000000000000 (1 ETH = 0x0de0b6b3a7640000)
         // Data: empty
         // Chain ID: 1
-        // Expected Raw Tx:
-        // 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028eac09295bed4305b6274da0b770cbe84e60e9a8f82fcf9e96bbe50bcbaa1a2a007a39e8555f6b724457182e70eaec8654f10a625b579601aed264a43a01be50d
+        // Expected Raw Tx (canonical RFC 6979 deterministic signature):
+        // 0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83
 
         let pk_bytes: [u8; 32] = [0x46; 32];
         let private_key = Zeroizing::new(pk_bytes);
@@ -266,5 +279,66 @@ mod tests {
             raw_tx_pk,
             "0xf86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83"
         );
+    }
+
+    #[test]
+    fn test_parse_hex_or_dec_bytes_large_decimal_u128() {
+        // 20 ETH in wei = 20000000000000000000 > u64::MAX (18446744073709551615)
+        let parsed = parse_hex_or_dec_bytes("20000000000000000000").expect("Should parse 20 ETH decimal");
+        // 20 ETH = 0x01158e460913d00000 (9 bytes)
+        assert_eq!(parsed.len(), 9);
+        assert_eq!(parsed, hex::decode("01158e460913d00000").unwrap());
+
+        // Zero decimal
+        let zero = parse_hex_or_dec_bytes("0").expect("Should parse 0");
+        assert!(zero.is_empty());
+    }
+
+    #[test]
+    fn test_sign_evm_rejects_zero_and_invalid_address() {
+        let pk_bytes: [u8; 32] = [0x46; 32];
+        let private_key = Zeroizing::new(pk_bytes);
+        let gas_price = hex::decode("04a817c800").unwrap();
+        let value = hex::decode("0de0b6b3a7640000").unwrap();
+
+        // 1. Zero address [0u8; 20] must be rejected
+        let zero_addr = [0u8; 20];
+        let params_zero = EvmTxParams {
+            nonce: 0,
+            gas_price_wei: &gas_price,
+            gas_limit: 21000,
+            to: &zero_addr,
+            value_wei: &value,
+            data: &[],
+            chain_id: 1,
+        };
+        let res_zero = sign_evm_transaction(&private_key, &params_zero);
+        assert!(res_zero.is_err());
+        assert!(res_zero.unwrap_err().contains("zero address"));
+
+        // 2. Invalid length address must be rejected
+        let invalid_len = [0x35; 19];
+        let params_invalid = EvmTxParams {
+            nonce: 0,
+            gas_price_wei: &gas_price,
+            gas_limit: 21000,
+            to: &invalid_len,
+            value_wei: &value,
+            data: &[],
+            chain_id: 1,
+        };
+        let res_invalid = sign_evm_transaction(&private_key, &params_invalid);
+        assert!(res_invalid.is_err());
+    }
+
+    #[test]
+    fn test_derive_evm_address_from_secret() {
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let addr_seed = derive_evm_address_from_secret(mnemonic, "seed").expect("Derive from seed");
+        assert_eq!(addr_seed, "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
+
+        let pk = "0x4646464646464646464646464646464646464646464646464646464646464646";
+        let addr_pk = derive_evm_address_from_secret(pk, "pk").expect("Derive from pk");
+        assert_eq!(addr_pk, "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F");
     }
 }

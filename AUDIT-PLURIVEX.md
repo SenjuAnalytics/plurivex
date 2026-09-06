@@ -776,7 +776,7 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 ---
 
 ## 🛡️ REVISI v5 — Production Hardening & Precision Forensic Lifecycle (Lengkap)
-*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (41/41 Unit Test Deterministik Lulus)**
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (44 Unit Test: 43 Lintas-Platform + 1 Windows Lulus)**
 
 Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
@@ -835,6 +835,14 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
     - **Tauri IPC Command & Permissions (`sign_evm_transfer`)**: Terdaftar di `commands.rs`, `lib.rs`, dan whitelist `allow-rpc-get-balance.toml` (`commands.allow`), menggunakan struct `EvmTransferPayload` dan pembersihan string secret via `secure_zero_string`.
     - **Frontend Sweeper (`sweeper.ts`)**: Menghapus `deriveEvmWallet` dan `signer.signTransaction` di webview JavaScript, kini sepenuhnya menandatangani transaksi melalui `invoke('sign_evm_transfer')`. Mewujudkan arsitektur *"Zero key exposure in webview memory"*.
     - **Zero-Copy & Memory Polish**: Menyelaraskan seluruh 9 derivasi `bip32::XPrv::derive_from_path` ke `seed_bytes.as_ref()` (zero-copy) dan menambahkan `#[derive(Zeroize, ZeroizeOnDrop)]` pada `TargetAddressMatch`.
+
+13. **🛡️ Tahap 2b — Hardening Signing & Eliminasi Total Derivasi di Webview (Resolusi F1–F6)**
+    - **F1 (Komentar Test Vector EIP-155)**: Menyelaraskan komentar di `test_official_eip155_vector` dengan nilai hash kanonikal RFC 6979 (`...a028ef61...a067cbe9...`) yang cocok dengan ethers.js dan spesifikasi resmi EIP-155.
+    - **F2 (u128 Decimal Parsing)**: Memperbaiki `parse_hex_or_dec_bytes` agar menggunakan `val.to_be_bytes()` trimmed (u128 penuh), mencegah pemotongan nilai desimal transfer besar ($> \text{u64::MAX}$, misal $20\text{ ETH} = 2 \times 10^{19}\text{ wei}$). Dilengkapi unit test untuk 20 ETH desimal (9 byte) dan nilai 0.
+    - **F3 (Validasi Recipient Address `to`)**: Mewajibkan panjang recipient tepat 20 byte dan menolak zero address (`0x000...000` / `[0u8; 20]`) untuk mencegah terbakarnya dana akibat typo atau paste kosong. Dilengkapi unit test.
+    - **F4 (Eliminasi `deriveDualCredentials` di Webview Sweeper)**: Menghapus pemanggilan `deriveDualCredentials` (yang mengeksekusi `ethers.Wallet.fromMnemonic` dan memicu instansiasi `elliptic` di heap V8/Chromium) dari jalur EVM sweep di `sweeper.ts`. Alamat pengirim kini diambil langsung dari `senderAddress` (sudah ada di UI) atau diderivasi secara native di Rust via Tauri command `get_evm_address` dengan `Zeroizing`. Kunci privat EVM tidak pernah disentuh oleh heap JavaScript selama eksekusi sweep.
+    - **F5 (Batasan Type-0 pada Chain EIP-1559)**: Dicatat bahwa transaksi sweep EVM saat ini adalah Legacy Type-0; pada chain EIP-1559 (Base/Arbitrum), `gasPrice` dari `eth_gasPrice` berlaku sebagai effective price (selisih terhadap base fee menjadi tip validator). Transaksi sweep saldo bersih terbukti aman dan valid di seluruh node target; implementasi Type-2 (EIP-1559 dynamic fee) diagendakan untuk optimasi efisiensi biaya.
+    - **F6 (Penghitungan Test Deterministik)**: Format pengujian diperbarui secara akurat: **44 unit test** (43 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
 
 

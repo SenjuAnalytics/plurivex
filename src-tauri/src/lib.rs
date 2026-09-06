@@ -17,6 +17,7 @@ pub fn run() {
             app::commands::get_account_nonce_and_balance,
             app::commands::broadcast_raw_tx,
             app::commands::sign_evm_transfer,
+            app::commands::get_evm_address,
             app::commands::broadcast_solana_tx,
             app::commands::get_solana_recent_blockhash,
             app::commands::get_solana_account_details,

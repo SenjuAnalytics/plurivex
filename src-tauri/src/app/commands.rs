@@ -492,6 +492,14 @@ pub fn sign_evm_transfer(
     res
 }
 
+#[tauri::command]
+pub fn get_evm_address(mut secret: String, wallet_type: String) -> Result<String, String> {
+    let res = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type);
+    // Auto-wipe secret string parameter from RAM immediately
+    crate::core::security::memory::secure_zero_string(&mut secret);
+    res
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -244,6 +244,7 @@ export async function executeSweepSingle(
   chainKey: string,
   recipientAddress: string,
   customGasPriceGwei?: number,
+  senderAddress?: string,
 ): Promise<SweepTxResult> {
   const cfg = SWEEP_CHAINS[chainKey] || SWEEP_CHAINS.eth;
 
@@ -389,8 +390,23 @@ export async function executeSweepSingle(
   }
 
   // 2. EVM Sweep Execution
-  const creds = deriveDualCredentials(secret, walletType);
-  const fromAddress = creds.evmAddress;
+  // Derivation done natively in Rust (Zero key exposure in webview memory)
+  let fromAddress = senderAddress;
+  if (!fromAddress) {
+    try {
+      fromAddress = await invoke<string>("get_evm_address", {
+        secret,
+        walletType,
+      });
+    } catch {
+      return {
+        walletId,
+        address: recipientAddress,
+        success: false,
+        error: "Invalid wallet type or secret for EVM",
+      };
+    }
+  }
 
   if (!fromAddress) {
     return {
