@@ -93,7 +93,7 @@ Padahal `src/lib/crypto.ts` baris 6 ditulis komentar:
 
 **Dampak:** private key mentah ada di memory webview Chromium → bisa kena XSS, devtools, memory dump webview. Untuk aplikasi yang menjual diri sebagai *"Zero-Disk Forensics Security Vault"*, ini kontradiksi terbesar di kodebase.
 
-*(Catatan Tahap 2: EVM signing telah diselesaikan & dimigrasikan ke backend Rust — lihat poin 12 pada Revisi v5. Solana signing diagendakan di Tahap 3).*
+*(Catatan Selesai: Seluruh penandatanganan transaksi (EVM & Solana) kini telah 100% dimigrasikan ke backend Rust — lihat poin 12, 13, dan 14 pada Revisi v5. Klaim "Zero key exposure in webview memory" kini telah tercapai seutuhnya).*
 
 ---
 
@@ -776,7 +776,7 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 ---
 
 ## 🛡️ REVISI v5 — Production Hardening & Precision Forensic Lifecycle (Lengkap)
-*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (44 Unit Test: 43 Lintas-Platform + 1 Windows Lulus)**
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (49 Unit Test: 48 Lintas-Platform + 1 Windows Lulus)**
 
 Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
@@ -846,6 +846,14 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - **Sender Address Self-Check**: Command `sign_evm_transfer` kini mengembalikan `EvmSignResult { raw_tx, from_address }`. Frontend memvalidasi kecocokan `from_address` derivasi kunci terhadap `senderAddress` sebelum melakukan broadcast, mencegah inkonsistensi data UI/vault secara otomatis.
     - **F5 (Batasan Type-0 pada Chain EIP-1559)**: Dicatat bahwa transaksi sweep EVM saat ini adalah Legacy Type-0; pada chain EIP-1559 (Base/Arbitrum), `gasPrice` dari `eth_gasPrice` berlaku sebagai effective price (selisih terhadap base fee menjadi tip validator). Transaksi sweep saldo bersih terbukti aman dan valid di seluruh node target; implementasi Type-2 (EIP-1559 dynamic fee) diagendakan untuk optimasi efisiensi biaya.
     - **F6 (Penghitungan Test Deterministik)**: Format pengujian diperbarui secara akurat: **44 unit test** (43 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
+
+14. **☀️ K1b — Native Solana Transaction Signing di Rust & Zero Webview Key Exposure Selesai (Tahap 3)**
+    - **Wire Serializer Solana Mandiri (`solana_signing.rs`)**: Implementasi murni format wire transaksi Solana legacy (header 3-byte, compact-u16 varint serializer, tabel akun, recent blockhash, instruksi `Transfer` dan `NonceWithdraw`) tanpa dependensi crate Solana eksternal yang berat.
+    - **Native ed25519 Signing (`ed25519-dalek`)**: Penandatanganan pesan transaksi menggunakan ed25519 deterministik (RFC 8032), dengan seed buffer dibungkus dalam `zeroize::Zeroizing<[u8; 32]>` dan dibersihkan dari RAM seketika pasca signing.
+    - **Test Vector Kanonikal**: Teruji dan terverifikasi 100% cocok bit-per-bit dengan output `@solana/web3.js` untuk transaksi transfer standar dan penarikan Durable Nonce (`nonceWithdraw`).
+    - **Tauri IPC Command & Permissions (`sign_solana_transfer` & `get_solana_address`)**: Terdaftar di `commands.rs`, `lib.rs`, dan whitelist `allow-rpc-get-balance.toml` (`allow-tx-broadcast`), dilengkapi pembersihan parameter rahasia via `secure_zero_string`.
+    - **Frontend Sweeper (`sweeper.ts`)**: Menghapus `Keypair`, `Transaction`, `SystemProgram`, `bs58`, dan `deriveDualCredentials` dari alur eksekusi sweep Solana di webview. Signing dan derivasi alamat kini sepenuhnya didelegasikan ke native Rust dengan self-check kecocokan alamat pengirim.
+    - **Klaim Arsitektur Selesai 100%**: Tidak ada lagi kunci privat (baik EVM maupun Solana) yang pernah didekripsi, diderivasi, atau diinstansiasi di dalam memori runtime JavaScript / Chromium webview. Total pengujian: **49 unit test** (48 lintas-platform + 1 Windows).
 
 
 

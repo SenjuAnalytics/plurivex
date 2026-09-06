@@ -1,9 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ethers } from "ethers";
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import bs58 from "bs58";
 import type { WalletType } from "./types";
-import { deriveDualCredentials, shortAddr } from "./wallet";
+import { shortAddr } from "./wallet";
 
 export interface SweepChainConfig {
   key: string;
@@ -251,25 +249,31 @@ export async function executeSweepSingle(
   // 1. Solana Sweep Execution
   if (chainKey === "sol") {
     try {
-      const creds = deriveDualCredentials(secret, walletType);
-      const solSecret = creds.solPrivateKey ?? secret.trim();
-      const bytes = bs58.decode(solSecret);
-      let keypair: Keypair;
-      if (bytes.length === 64) {
-        keypair = Keypair.fromSecretKey(bytes);
-      } else if (bytes.length === 32) {
-        keypair = Keypair.fromSeed(bytes);
-      } else {
+      let fromAddress = senderAddress;
+      if (!fromAddress) {
+        try {
+          fromAddress = await invoke<string>("get_solana_address", {
+            secret,
+            walletType,
+          });
+        } catch {
+          return {
+            walletId,
+            address: recipientAddress,
+            success: false,
+            error: "Invalid Solana secret key or mnemonic",
+          };
+        }
+      }
+
+      if (!fromAddress) {
         return {
           walletId,
           address: recipientAddress,
           success: false,
-          error: "Invalid Solana secret key length",
+          error: "Unable to determine Solana sender address",
         };
       }
-
-      const fromAddress = keypair.publicKey.toBase58();
-      const toPublicKey = new PublicKey(recipientAddress.trim());
 
       const acc = await invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
         chainKey: "sol",
@@ -329,10 +333,6 @@ export async function executeSweepSingle(
         }
       }
 
-      const transaction = new Transaction();
-      transaction.feePayer = keypair.publicKey;
-      transaction.recentBlockhash = recentBlockhash;
-
       if (accountDetails?.account_type === "nonce_account") {
         const authorityStr = accountDetails.authority;
         if (authorityStr && authorityStr !== fromAddress) {
@@ -343,30 +343,37 @@ export async function executeSweepSingle(
             error: `Akun ini adalah Durable Nonce, dan hak kuasanya (Authority) dipegang oleh ${shortAddr(authorityStr)}. Hanya pemegang kunci authority tersebut yang dapat menandatangani penarikan dana.`,
           };
         }
-        transaction.add(
-          SystemProgram.nonceWithdraw({
-            noncePubkey: keypair.publicKey,
-            authorizedPubkey: keypair.publicKey,
-            toPubkey: toPublicKey,
-            lamports: lamportsToSend,
-          })
-        );
-      } else {
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: keypair.publicKey,
-            toPubkey: toPublicKey,
-            lamports: lamportsToSend,
-          })
-        );
       }
 
-      transaction.sign(keypair);
-      const serialized = transaction.serialize();
-      const rawTxBase64 = btoa(String.fromCharCode(...new Uint8Array(serialized)));
+      // Sign transaction offline natively in Rust (Zero-Disk & Zero-Webview key exposure)
+      interface SolanaSignResult {
+        rawTxBase64: string;
+        fromAddress: string;
+      }
+
+      const signResult = await invoke<SolanaSignResult>("sign_solana_transfer", {
+        secret,
+        walletType,
+        tx: {
+          recipient: recipientAddress.trim(),
+          lamports: lamportsToSend,
+          recentBlockhash,
+          isNonceAccount: accountDetails?.account_type === "nonce_account",
+        },
+      });
+
+      // Self-check: verify that derived fromAddress matches expected
+      if (signResult.fromAddress !== fromAddress) {
+        return {
+          walletId,
+          address: fromAddress,
+          success: false,
+          error: `Solana sender address mismatch (expected ${fromAddress}, derived ${signResult.fromAddress})`,
+        };
+      }
 
       const txHash = await invoke<string>("broadcast_solana_tx", {
-        rawTxBase64,
+        rawTxBase64: signResult.rawTxBase64,
       });
 
       const amountSent = `${(lamportsToSend / 1e9).toFixed(6)} SOL`;

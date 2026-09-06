@@ -511,6 +511,45 @@ pub fn get_evm_address(mut secret: String, wallet_type: String) -> Result<String
     res
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SolanaTransferPayload {
+    pub recipient: String,
+    pub lamports: u64,
+    pub recent_blockhash: String,
+    pub is_nonce_account: bool,
+}
+
+#[tauri::command]
+pub fn sign_solana_transfer(
+    mut secret: String,
+    wallet_type: String,
+    tx: SolanaTransferPayload,
+) -> Result<crate::core::wallets::solana_signing::SolanaSignResult, String> {
+    let params = crate::core::wallets::solana_signing::SolanaTransferParams {
+        recipient: &tx.recipient,
+        lamports: tx.lamports,
+        recent_blockhash: &tx.recent_blockhash,
+        is_nonce_account: tx.is_nonce_account,
+    };
+    let res = crate::core::wallets::solana_signing::sign_solana_transfer_with_secret(
+        &secret,
+        &wallet_type,
+        &params,
+    );
+    // Auto-wipe secret string parameter from RAM immediately
+    crate::core::security::memory::secure_zero_string(&mut secret);
+    res
+}
+
+#[tauri::command]
+pub fn get_solana_address(mut secret: String, wallet_type: String) -> Result<String, String> {
+    let res = crate::core::wallets::solana_signing::derive_solana_address_from_secret(&secret, &wallet_type);
+    // Auto-wipe secret string parameter from RAM immediately
+    crate::core::security::memory::secure_zero_string(&mut secret);
+    res
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
