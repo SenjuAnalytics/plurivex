@@ -293,7 +293,8 @@ export async function executeSweepSingle(
         };
       }
 
-      const lamportsToSend = Number(lamports - feeLamports);
+      const netLamports = lamports - feeLamports;
+      const lamportsToSend = netLamports.toString();
 
       let accountDetails: {
         exists?: boolean;
@@ -376,7 +377,7 @@ export async function executeSweepSingle(
         rawTxBase64: signResult.rawTxBase64,
       });
 
-      const amountSent = `${(lamportsToSend / 1e9).toFixed(6)} SOL`;
+      const amountSent = `${(Number(netLamports) / 1e9).toFixed(6)} SOL`;
 
       return {
         walletId,

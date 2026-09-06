@@ -21,9 +21,12 @@ commands.allow = [
 [[permission]]
 identifier = "allow-tx-broadcast"
 description = "Allow broadcasting signed raw transactions"
+commands.allow = ["broadcast_raw_tx", "broadcast_solana_tx"]
+
+[[permission]]
+identifier = "allow-native-signing"
+description = "Derive addresses and sign transactions natively (no network)"
 commands.allow = [
-  "broadcast_raw_tx",
-  "broadcast_solana_tx",
   "sign_evm_transfer",
   "get_evm_address",
   "sign_solana_transfer",

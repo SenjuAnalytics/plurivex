@@ -477,10 +477,11 @@ pub struct EvmSignResult {
 
 #[tauri::command]
 pub fn sign_evm_transfer(
-    mut secret: String,
+    secret: String,
     wallet_type: String,
     tx: EvmTransferPayload,
 ) -> Result<EvmSignResult, String> {
+    let mut secret = zeroize::Zeroizing::new(secret);
     let from_address = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type)?;
     let params = crate::core::wallets::signing::EvmTransferParams {
         chain_id: tx.chain_id,
@@ -495,7 +496,7 @@ pub fn sign_evm_transfer(
         &wallet_type,
         &params,
     )?;
-    // Auto-wipe secret string parameter from RAM immediately
+    // Explicit wipe before drop (plus Zeroizing<String> drops and zeroes unconditionally on any exit path)
     crate::core::security::memory::secure_zero_string(&mut secret);
     Ok(EvmSignResult {
         raw_tx,
@@ -504,17 +505,72 @@ pub fn sign_evm_transfer(
 }
 
 #[tauri::command]
-pub fn get_evm_address(mut secret: String, wallet_type: String) -> Result<String, String> {
+pub fn get_evm_address(secret: String, wallet_type: String) -> Result<String, String> {
+    let mut secret = zeroize::Zeroizing::new(secret);
     let res = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type);
-    // Auto-wipe secret string parameter from RAM immediately
     crate::core::security::memory::secure_zero_string(&mut secret);
     res
+}
+
+fn deserialize_u64_from_number_or_str<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct U64Visitor;
+    impl<'de> serde::de::Visitor<'de> for U64Visitor {
+        type Value = u64;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a u64 integer or string representing u64")
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(v)
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            if v >= 0 {
+                Ok(v as u64)
+            } else {
+                Err(serde::de::Error::custom("lamports cannot be negative"))
+            }
+        }
+
+        fn visit_f64<E>(self, v: f64) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            if v >= 0.0 && v <= u64::MAX as f64 {
+                Ok(v as u64)
+            } else {
+                Err(serde::de::Error::custom("out of range for u64"))
+            }
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<u64, E>
+        where
+            E: serde::de::Error,
+        {
+            v.trim()
+                .parse::<u64>()
+                .map_err(|e| serde::de::Error::custom(format!("invalid lamports u64 string: {e}")))
+        }
+    }
+
+    deserializer.deserialize_any(U64Visitor)
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SolanaTransferPayload {
     pub recipient: String,
+    #[serde(deserialize_with = "deserialize_u64_from_number_or_str")]
     pub lamports: u64,
     pub recent_blockhash: String,
     pub is_nonce_account: bool,
@@ -522,10 +578,11 @@ pub struct SolanaTransferPayload {
 
 #[tauri::command]
 pub fn sign_solana_transfer(
-    mut secret: String,
+    secret: String,
     wallet_type: String,
     tx: SolanaTransferPayload,
 ) -> Result<crate::core::wallets::solana_signing::SolanaSignResult, String> {
+    let mut secret = zeroize::Zeroizing::new(secret);
     let params = crate::core::wallets::solana_signing::SolanaTransferParams {
         recipient: &tx.recipient,
         lamports: tx.lamports,
@@ -537,21 +594,52 @@ pub fn sign_solana_transfer(
         &wallet_type,
         &params,
     );
-    // Auto-wipe secret string parameter from RAM immediately
     crate::core::security::memory::secure_zero_string(&mut secret);
     res
 }
 
 #[tauri::command]
-pub fn get_solana_address(mut secret: String, wallet_type: String) -> Result<String, String> {
+pub fn get_solana_address(secret: String, wallet_type: String) -> Result<String, String> {
+    let mut secret = zeroize::Zeroizing::new(secret);
     let res = crate::core::wallets::solana_signing::derive_solana_address_from_secret(&secret, &wallet_type);
-    // Auto-wipe secret string parameter from RAM immediately
     crate::core::security::memory::secure_zero_string(&mut secret);
     res
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zeroizing_secret_cleanup() {
+        use zeroize::Zeroize;
+        let mut s = zeroize::Zeroizing::new("super_secret_mnemonic_phrase_here".to_string());
+        assert_eq!(&*s, "super_secret_mnemonic_phrase_here");
+        s.zeroize();
+        assert!(s.chars().all(|c| c == '\0'));
+    }
+
+    #[test]
+    fn test_solana_transfer_payload_deserialize_number_and_string() {
+        let json_number = r#"{
+            "recipient": "11111111111111111111111111111111",
+            "lamports": 1000000000,
+            "recentBlockhash": "EkSnNWid2cvwEVnPx9aZaWBrespocAcjwn4SXSpMmMQx",
+            "isNonceAccount": false
+        }"#;
+        let payload1: SolanaTransferPayload = serde_json::from_str(json_number).unwrap();
+        assert_eq!(payload1.lamports, 1_000_000_000);
+
+        let json_string = r#"{
+            "recipient": "11111111111111111111111111111111",
+            "lamports": "18446744073709551615",
+            "recentBlockhash": "EkSnNWid2cvwEVnPx9aZaWBrespocAcjwn4SXSpMmMQx",
+            "isNonceAccount": false
+        }"#;
+        let payload2: SolanaTransferPayload = serde_json::from_str(json_string).unwrap();
+        assert_eq!(payload2.lamports, u64::MAX);
+    }
+
     #[test]
     #[cfg(target_os = "windows")]
     fn test_windows_empty_clipboard() {
@@ -573,3 +661,4 @@ mod tests {
         }
     }
 }
+

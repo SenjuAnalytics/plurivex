@@ -93,7 +93,7 @@ Padahal `src/lib/crypto.ts` baris 6 ditulis komentar:
 
 **Dampak:** private key mentah ada di memory webview Chromium → bisa kena XSS, devtools, memory dump webview. Untuk aplikasi yang menjual diri sebagai *"Zero-Disk Forensics Security Vault"*, ini kontradiksi terbesar di kodebase.
 
-*(Catatan Selesai: Seluruh penandatanganan transaksi (EVM & Solana) kini telah 100% dimigrasikan ke backend Rust — lihat poin 12, 13, dan 14 pada Revisi v5. Klaim "Zero key exposure in webview memory" kini telah tercapai seutuhnya).*
+*(Catatan Progres: Seluruh derivasi kunci dan penandatanganan transaksi (EVM & Solana) pada alur sweeper kini 100% dieksekusi di backend Rust — lihat poin 12, 13, 14, dan 15 pada Revisi v5. Webview hanya memegang secret terenkripsi dan plaintext sementara selama payload IPC dikirim ke Rust; eliminasi total transmisi plaintext dari webview akan dituntaskan pada K3-lite).*
 
 ---
 
@@ -847,13 +847,19 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
     - **F5 (Batasan Type-0 pada Chain EIP-1559)**: Dicatat bahwa transaksi sweep EVM saat ini adalah Legacy Type-0; pada chain EIP-1559 (Base/Arbitrum), `gasPrice` dari `eth_gasPrice` berlaku sebagai effective price (selisih terhadap base fee menjadi tip validator). Transaksi sweep saldo bersih terbukti aman dan valid di seluruh node target; implementasi Type-2 (EIP-1559 dynamic fee) diagendakan untuk optimasi efisiensi biaya.
     - **F6 (Penghitungan Test Deterministik)**: Format pengujian diperbarui secara akurat: **44 unit test** (43 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
-14. **☀️ K1b — Native Solana Transaction Signing di Rust & Zero Webview Key Exposure Selesai (Tahap 3)**
+14. **☀️ K1b — Native Solana Transaction Signing di Rust & Zero Webview Key Exposure (Tahap 3)**
     - **Wire Serializer Solana Mandiri (`solana_signing.rs`)**: Implementasi murni format wire transaksi Solana legacy (header 3-byte, compact-u16 varint serializer, tabel akun, recent blockhash, instruksi `Transfer` dan `NonceWithdraw`) tanpa dependensi crate Solana eksternal yang berat.
     - **Native ed25519 Signing (`ed25519-dalek`)**: Penandatanganan pesan transaksi menggunakan ed25519 deterministik (RFC 8032), dengan seed buffer dibungkus dalam `zeroize::Zeroizing<[u8; 32]>` dan dibersihkan dari RAM seketika pasca signing.
     - **Test Vector Kanonikal**: Teruji dan terverifikasi 100% cocok bit-per-bit dengan output `@solana/web3.js` untuk transaksi transfer standar dan penarikan Durable Nonce (`nonceWithdraw`).
-    - **Tauri IPC Command & Permissions (`sign_solana_transfer` & `get_solana_address`)**: Terdaftar di `commands.rs`, `lib.rs`, dan whitelist `allow-rpc-get-balance.toml` (`allow-tx-broadcast`), dilengkapi pembersihan parameter rahasia via `secure_zero_string`.
+    - **Tauri IPC Command & Permissions (`sign_solana_transfer` & `get_solana_address`)**: Terdaftar di `commands.rs`, `lib.rs`, dan whitelist `allow-rpc-get-balance.toml` (`allow-native-signing`), dilengkapi pembersihan parameter rahasia via `secure_zero_string`.
     - **Frontend Sweeper (`sweeper.ts`)**: Menghapus `Keypair`, `Transaction`, `SystemProgram`, `bs58`, dan `deriveDualCredentials` dari alur eksekusi sweep Solana di webview. Signing dan derivasi alamat kini sepenuhnya didelegasikan ke native Rust dengan self-check kecocokan alamat pengirim.
-    - **Klaim Arsitektur Selesai 100%**: Tidak ada lagi kunci privat (baik EVM maupun Solana) yang pernah didekripsi, diderivasi, atau diinstansiasi di dalam memori runtime JavaScript / Chromium webview. Total pengujian: **49 unit test** (48 lintas-platform + 1 Windows).
+    - **Status Arsitektur Transaksi**: Seluruh derivasi kunci kriptografis dan penandatanganan transaksi (EVM & Solana) pada alur sweep kini 100% dieksekusi di backend Rust. Webview tidak lagi menginstansiasi library kripto atau memproses signing; webview hanya memegang ciphertext vault dan plaintext sementara selama IPC. Eliminasi total dekripsi di webview dijadwalkan pada Tahap K3-lite (dekripsi native di Rust).
+
+15. **🛡️ Resolusi Review F7, F8, F10 & Hardening IPC Signing**
+    - **F7 (`Zeroizing<String>` Anti-Leak Guard)**: Membungkus argumen secret dalam `zeroize::Zeroizing<String>` di seluruh Tauri command (`sign_evm_transfer`, `get_evm_address`, `sign_solana_transfer`, `get_solana_address`), menjamin buffer memori heap String di-zeroize seketika pada semua jalur keluar (termasuk early-return operator `?` saat error dan panic). Dilengkapi unit test `test_zeroizing_secret_cleanup`.
+    - **F8 (Lossless Deserialisasi Lamports)**: Mendukung deserialisasi `lamports` u64 baik dari format angka maupun string desimal (`deserialize_u64_from_number_or_str`), menjaga presisi penuh di atas $2^{53}$ lamports tanpa pembulatan floating point. Dilengkapi unit test `test_solana_transfer_payload_deserialize_number_and_string`.
+    - **F10 (Pemisahan Granular Permission)**: Memisahkan permission Tauri menjadi `allow-tx-broadcast` (khusus broadcast network) dan `allow-native-signing` (khusus derivasi & offline signing) di `allow-rpc-get-balance.toml` dan `default.json`.
+    - **Total Pengujian**: **51 unit test** (50 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
 
 

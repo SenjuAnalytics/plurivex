@@ -15,6 +15,7 @@
     "allow-scan-balances",
     "allow-fee-estimate",
     "allow-tx-broadcast",
+    "allow-native-signing",
     "allow-directory-scan",
     "allow-clipboard-clear",
     "allow-window-controls",
