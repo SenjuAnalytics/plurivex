@@ -203,7 +203,7 @@ pub fn derive_dual_credentials_native(
             let path: DerivationPath = "m/44'/60'/0'/0/0"
                 .parse()
                 .map_err(|e| format!("Invalid derivation path: {}", e))?;
-            let xprv = XPrv::derive_from_path(*seed_bytes, &path)
+            let xprv = XPrv::derive_from_path(seed_bytes.as_ref(), &path)
                 .map_err(|e| format!("EVM HD derivation failed: {}", e))?;
             let evm_pk_bytes: Zeroizing<[u8; 32]> =
                 Zeroizing::new(xprv.private_key().to_bytes().into());
@@ -217,7 +217,7 @@ pub fn derive_dual_credentials_native(
 
             // 3. Bitcoin BIP-84 Native SegWit (path: m/84'/0'/0'/0/0) -> bc1q...
             let (btc_address, btc_private_key) = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
-                Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+                Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
                     Ok(x) => {
                         let pk: Zeroizing<[u8; 32]> =
                             Zeroizing::new(x.private_key().to_bytes().into());
@@ -233,7 +233,7 @@ pub fn derive_dual_credentials_native(
 
             // 4. Bitcoin BIP-44 Legacy (path: m/44'/0'/0'/0/0) -> 1...
             let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
-                Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+                Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
                     Ok(x) => {
                         let pk: Zeroizing<[u8; 32]> =
                             Zeroizing::new(x.private_key().to_bytes().into());
@@ -330,7 +330,7 @@ pub fn derive_evm_address_only_native(
         Ok(p) => p,
         Err(_) => return Ok(None),
     };
-    match XPrv::derive_from_path(*seed_bytes, &path) {
+    match XPrv::derive_from_path(seed_bytes.as_ref(), &path) {
         Ok(xprv) => {
             let pk_bytes: Zeroizing<[u8; 32]> =
                 Zeroizing::new(xprv.private_key().to_bytes().into());
@@ -375,7 +375,7 @@ pub fn derive_bitcoin_addresses_only_native(
 
     // 1. Native SegWit (BIP-84) "bc1q..."
     let btc_address = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
-        Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
             Ok(x) => {
                 let pk: Zeroizing<[u8; 32]> =
                     Zeroizing::new(x.private_key().to_bytes().into());
@@ -391,7 +391,7 @@ pub fn derive_bitcoin_addresses_only_native(
 
     // 2. Nested SegWit P2SH (BIP-49) "3..."
     let btc_p2sh_address = match "m/49'/0'/0'/0/0".parse::<DerivationPath>() {
-        Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
             Ok(x) => {
                 let pk: Zeroizing<[u8; 32]> =
                     Zeroizing::new(x.private_key().to_bytes().into());
@@ -404,7 +404,7 @@ pub fn derive_bitcoin_addresses_only_native(
 
     // 3. Legacy (BIP-44) "1..."
     let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
-        Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
             Ok(x) => {
                 let pk: Zeroizing<[u8; 32]> =
                     Zeroizing::new(x.private_key().to_bytes().into());
@@ -434,7 +434,7 @@ pub fn derive_public_addresses_only_native(
 
     // 1. EVM Public Address (BIP-44 path: m/44'/60'/0'/0/0)
     let evm_address = match "m/44'/60'/0'/0/0".parse::<DerivationPath>() {
-        Ok(path) => match XPrv::derive_from_path(*seed_bytes, &path) {
+        Ok(path) => match XPrv::derive_from_path(seed_bytes.as_ref(), &path) {
             Ok(xprv) => {
                 let pk_bytes: Zeroizing<[u8; 32]> =
                     Zeroizing::new(xprv.private_key().to_bytes().into());
@@ -463,7 +463,7 @@ pub fn derive_public_addresses_only_native(
 
     // 3. Bitcoin BIP-84 Native SegWit (path: m/84'/0'/0'/0/0) -> bc1q...
     let btc_address = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
-        Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
             Ok(x) => {
                 let pk: Zeroizing<[u8; 32]> =
                     Zeroizing::new(x.private_key().to_bytes().into());
@@ -479,7 +479,7 @@ pub fn derive_public_addresses_only_native(
 
     // 4. Bitcoin BIP-44 Legacy (path: m/44'/0'/0'/0/0) -> 1...
     let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
-        Ok(p) => match XPrv::derive_from_path(*seed_bytes, &p) {
+        Ok(p) => match XPrv::derive_from_path(seed_bytes.as_ref(), &p) {
             Ok(x) => {
                 let pk: Zeroizing<[u8; 32]> =
                     Zeroizing::new(x.private_key().to_bytes().into());

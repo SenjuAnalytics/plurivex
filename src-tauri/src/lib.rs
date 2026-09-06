@@ -16,6 +16,7 @@ pub fn run() {
             app::commands::get_chain_fee_data,
             app::commands::get_account_nonce_and_balance,
             app::commands::broadcast_raw_tx,
+            app::commands::sign_evm_transfer,
             app::commands::broadcast_solana_tx,
             app::commands::get_solana_recent_blockhash,
             app::commands::get_solana_account_details,

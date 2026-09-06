@@ -93,6 +93,8 @@ Padahal `src/lib/crypto.ts` baris 6 ditulis komentar:
 
 **Dampak:** private key mentah ada di memory webview Chromium → bisa kena XSS, devtools, memory dump webview. Untuk aplikasi yang menjual diri sebagai *"Zero-Disk Forensics Security Vault"*, ini kontradiksi terbesar di kodebase.
 
+*(Catatan Tahap 2: EVM signing telah diselesaikan & dimigrasikan ke backend Rust — lihat poin 12 pada Revisi v5. Solana signing diagendakan di Tahap 3).*
+
 ---
 
 ### 🔴 2.2 — VALIDASI MNEMONIC BIP-39 DUPLIKAT & YANG DIPAKAI YANG JS
@@ -774,7 +776,7 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 ---
 
 ## 🛡️ REVISI v5 — Production Hardening & Precision Forensic Lifecycle (Lengkap)
-*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (35/35 Unit Test Deterministik Lulus)**
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (41/41 Unit Test Deterministik Lulus)**
 
 Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
@@ -825,6 +827,14 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
 11. **🚀 CI/CD — Automated GitHub Actions Verification Pipeline**
     - Menambahkan `.github/workflows/ci.yml` yang menguji typecheck TypeScript (`tsc`), bundle frontend (`vite build`), `cargo clippy -- -D warnings`, dan seluruh unit test `cargo test` lintas platform (Ubuntu & Windows) secara otomatis pada setiap push dan pull request di branch `main`.
+
+12. **🔐 K1 — Native EVM Transaction Signing di Rust & Zero Key Exposure di Webview (Tahap 2 Selesai)**
+    - **Pure Rust RLP Encoder (`rlp.rs`)**: Implementasi mandiri encoding byte string, integer, dan list standar Ethereum tanpa dependensi eksternal baru, teruji dengan 4 unit test kanonikal.
+    - **Native EIP-155 Signing (`signing.rs`)**: Penandatanganan transaksi EVM (Type 0 / EIP-155) langsung di backend Rust menggunakan `k256` ECDSA recoverable signing (RFC 6979 deterministik) dan Keccak-256 hashing. Seluruh private key secp256k1 dibungkus dalam `zeroize::Zeroizing<[u8; 32]>` dan dibersihkan seketika pasca penandatanganan.
+    - **Test Vector Resmi**: Terverifikasi lolos test vector resmi EIP-155 Ethereum Foundation (Vitalik Buterin) dan cocok 100% bit-per-bit dengan output `ethers.Wallet.signTransaction`.
+    - **Tauri IPC Command & Permissions (`sign_evm_transfer`)**: Terdaftar di `commands.rs`, `lib.rs`, dan whitelist `allow-rpc-get-balance.toml` (`commands.allow`), menggunakan struct `EvmTransferPayload` dan pembersihan string secret via `secure_zero_string`.
+    - **Frontend Sweeper (`sweeper.ts`)**: Menghapus `deriveEvmWallet` dan `signer.signTransaction` di webview JavaScript, kini sepenuhnya menandatangani transaksi melalui `invoke('sign_evm_transfer')`. Mewujudkan arsitektur *"Zero key exposure in webview memory"*.
+    - **Zero-Copy & Memory Polish**: Menyelaraskan seluruh 9 derivasi `bip32::XPrv::derive_from_path` ke `seed_bytes.as_ref()` (zero-copy) dan menambahkan `#[derive(Zeroize, ZeroizeOnDrop)]` pada `TargetAddressMatch`.
 
 
 

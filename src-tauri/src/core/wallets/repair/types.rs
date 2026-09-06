@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -10,9 +11,10 @@ pub struct WordAnalysis {
     pub suggestions: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetAddressMatch {
+    #[zeroize(skip)]
     pub position_index: usize,
     pub word: String,
     pub phrase: String,

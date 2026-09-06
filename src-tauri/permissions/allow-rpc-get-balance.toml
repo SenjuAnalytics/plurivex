@@ -21,7 +21,7 @@ commands.allow = [
 [[permission]]
 identifier = "allow-tx-broadcast"
 description = "Allow broadcasting signed raw transactions"
-commands.allow = ["broadcast_raw_tx", "broadcast_solana_tx"]
+commands.allow = ["broadcast_raw_tx", "broadcast_solana_tx", "sign_evm_transfer"]
 
 [[permission]]
 identifier = "allow-directory-scan"

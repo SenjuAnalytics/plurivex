@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
-import { deriveEvmWallet, deriveDualCredentials, shortAddr } from "./wallet";
+import { deriveDualCredentials, shortAddr } from "./wallet";
 
 export interface SweepChainConfig {
   key: string;
@@ -389,9 +389,10 @@ export async function executeSweepSingle(
   }
 
   // 2. EVM Sweep Execution
-  const signer = deriveEvmWallet(secret, walletType);
+  const creds = deriveDualCredentials(secret, walletType);
+  const fromAddress = creds.evmAddress;
 
-  if (!signer) {
+  if (!fromAddress) {
     return {
       walletId,
       address: recipientAddress,
@@ -399,8 +400,6 @@ export async function executeSweepSingle(
       error: "Invalid wallet type or secret for EVM",
     };
   }
-
-  const fromAddress = signer.address;
 
   try {
     const acc = await invoke<AccountInfoRaw>("get_account_nonce_and_balance", {
@@ -428,17 +427,19 @@ export async function executeSweepSingle(
 
     const netAmount = balance.sub(fee);
 
-    // Sign transaction offline locally in memory
-    const txRequest: ethers.providers.TransactionRequest = {
-      to: recipientAddress.trim(),
-      value: netAmount,
-      gasLimit,
-      gasPrice,
-      nonce: acc.nonce,
-      chainId: cfg.chainId,
-    };
-
-    const rawTx = await signer.signTransaction(txRequest);
+    // Sign transaction offline natively in Rust (Zero-Disk & Zero-Webview key exposure)
+    const rawTx = await invoke<string>("sign_evm_transfer", {
+      secret,
+      walletType,
+      tx: {
+        chainId: cfg.chainId,
+        toAddress: recipientAddress.trim(),
+        valueWeiHex: netAmount.toHexString(),
+        gasPriceWeiHex: gasPrice.toHexString(),
+        gasLimit: gasLimit.toNumber(),
+        nonce: acc.nonce,
+      },
+    });
 
     // Broadcast raw transaction via native Rust client (CORS-free)
     const txHash = await invoke<string>("broadcast_raw_tx", {

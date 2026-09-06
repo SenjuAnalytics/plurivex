@@ -457,6 +457,41 @@ pub async fn scan_phrase_on_the_fly(phrase: String) -> Result<OnTheFlyBalanceRes
     })
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvmTransferPayload {
+    pub chain_id: u64,
+    pub to_address: String,
+    pub value_wei_hex: String,
+    pub gas_price_wei_hex: String,
+    pub gas_limit: u64,
+    pub nonce: u64,
+}
+
+#[tauri::command]
+pub fn sign_evm_transfer(
+    mut secret: String,
+    wallet_type: String,
+    tx: EvmTransferPayload,
+) -> Result<String, String> {
+    let params = crate::core::wallets::signing::EvmTransferParams {
+        chain_id: tx.chain_id,
+        to_address: &tx.to_address,
+        value_wei_hex: &tx.value_wei_hex,
+        gas_price_wei_hex: &tx.gas_price_wei_hex,
+        gas_limit: tx.gas_limit,
+        nonce: tx.nonce,
+    };
+    let res = crate::core::wallets::signing::sign_evm_transfer_with_secret(
+        &secret,
+        &wallet_type,
+        &params,
+    );
+    // Auto-wipe secret string parameter from RAM immediately
+    crate::core::security::memory::secure_zero_string(&mut secret);
+    res
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
