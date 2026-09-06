@@ -950,14 +950,17 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Memperbarui teks deskripsi menjadi *"Simulate parallel buys and sells across Uniswap, PancakeSwap, & Raydium..."*.
     - **Total Pengujian**: **59 unit test** lolos (58 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite & TypeScript build bersih.
 
-
-
-
-
-
-
-
-
-
-
-
+23. **🛡️ Penutupan Residual K3 & Pengerasan Permukaan Serangan Downgrade IPC**
+    - **Penyelesaian Residual A: Native Rust PIN Unlock (`commands.rs`, `lib.rs`, `useAuthVault.ts`)**:
+      - Memigrasikan seluruh logika PIN unlock dan pembuatan PIN langsung ke dalam backend Rust melalui command `vault_session_unlock_with_pin` dan `vault_setup_pin_scoped`.
+      - Pada `vault_session_unlock_with_pin`: Rust langsung memvalidasi token PIN dari tabel SQLite `meta`, mendekripsi `pin_vault` (master password) di dalam buffer `Zeroizing<String>`, dan membuka sesi aktif `SessionManager`. Master password tidak pernah menyentuh memori JavaScript / V8 heap sama sekali saat login dengan PIN.
+      - Pada `vault_setup_pin_scoped`: Pembuatan token verifikasi PIN dan enkripsi `pin_vault` dieksekusi 100% di backend Rust menggunakan `session_token` aktif.
+    - **Penyelesaian Residual B: Eliminasi Pintu Downgrade & Legacy Sealed Commands (`commands.rs`, `lib.rs`, `allow-rpc-get-balance.toml`, `crypto.ts`)**:
+      - Menghapus command warisan `sign_evm_transfer_sealed`, `get_evm_address_sealed`, `sign_solana_transfer_sealed`, dan `get_solana_address_sealed` dari `generate_handler!` dan ACL permissions, sehingga tidak ada lagi celah downgrade untuk melewati otorisasi berbasis sesi.
+      - Menghapus command `vault_encrypt`, `vault_encrypt_batch`, dan `vault_decrypt` dari antarmuka IPC Tauri dan membersihkan wrapper usang di `src/lib/crypto.ts`. Seluruh enkripsi kredensial kini diwajibkan melalui `vault_encrypt_with_session` atau `vault_encrypt_batch_with_session`.
+    - **Penyelesaian Residual C: Unit Test Scoped IPC Command-Level & Isolasi Concurrency (`commands.rs`)**:
+      - Mengganti unit test warisan dengan `test_scoped_signing_rejects_after_lock_and_invalid_token` untuk menguji penolakan mutlak sesudah `sm.lock()` dan terhadap token tidak valid.
+      - Mengisolasi instans `SessionManager` pada unit test di `commands.rs` untuk menjamin eksekusi multi-thread `cargo test` berjalan independen tanpa tabrakan konkurensi antar-thread.
+    - **Penyelesaian Residual D: Ketahanan Mutex Poisoning (`session.rs`)**:
+      - Memperbarui seluruh pemanggilan mutex lock pada `SessionManager` (`unlock`, `lock`, `is_authenticated`, `get_master_key`, `is_locked`) menggunakan `.unwrap_or_else(|e| e.into_inner())` guna menjamin sesi tidak lumpuh jika terjadi panic pada thread lain.
+    - **Total Pengujian**: **59 unit test** lolos (58 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite & TypeScript build 100% bersih.

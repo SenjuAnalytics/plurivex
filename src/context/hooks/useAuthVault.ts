@@ -5,15 +5,12 @@ import {
   hasMasterPassword,
   saveMasterPassword,
   getVerificationToken,
-  savePinVault,
   getPinData,
   resetEntireVault,
 } from '../../lib/db';
 import {
   createVerificationToken,
   verifyPassword,
-  encrypt,
-  decrypt,
 } from '../../lib/crypto';
 import type { ToastType, WalletView } from '../../lib/types';
 
@@ -102,18 +99,20 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
     const token = await createVerificationToken(pw);
     await saveMasterPassword(token);
 
-    if (pin && pin.trim().length >= 4) {
-      const pinToken = await createVerificationToken(pin);
-      const encryptedMasterPw = await encrypt(pw, pin);
-      await savePinVault(pinToken, encryptedMasterPw);
-      setHasPin(true);
-    }
-
     const sToken = await invoke<string>('vault_session_unlock', {
       password: pw,
       timeoutSeconds: autoLockMinutes * 60,
     });
     setSessionToken(sToken);
+
+    if (pin && pin.trim().length >= 4) {
+      await invoke('vault_setup_pin_scoped', {
+        sessionToken: sToken,
+        pin: pin.trim(),
+      });
+      setHasPin(true);
+    }
+
     await loadWallets();
     setScreen('app');
     toast('Brankas berhasil dibuat & terenkripsi!', 'success');
@@ -145,36 +144,23 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
     return false;
   };
 
-  // 5. Unlock with Quick PIN
+  // 5. Unlock with Quick PIN (100% Native Rust execution - master password never touches JS V8)
   const unlockWithPin = async (pin: string): Promise<boolean> => {
-    const pinData = await getPinData();
-    if (!pinData) {
-      // Fallback: check if the master password matches the PIN directly
-      return await unlock(pin);
+    try {
+      const sToken = await invoke<string>('vault_session_unlock_with_pin', {
+        pin: pin.trim(),
+        timeoutSeconds: autoLockMinutes * 60,
+      });
+      setSessionToken(sToken);
+      await loadWallets();
+      setScreen('app');
+      toast('Brankas berhasil dibuka via PIN!', 'success');
+      return true;
+    } catch (err) {
+      console.warn('PIN unlock failed:', err);
+      toast('PIN yang dimasukkan salah', 'error');
+      return false;
     }
-
-    const ok = await verifyPassword(pinData.pinToken, pin);
-    if (ok) {
-      try {
-        let decryptedMasterPw = await decrypt(pinData.pinVault, pin);
-        if (decryptedMasterPw) {
-          const sToken = await invoke<string>('vault_session_unlock', {
-            password: decryptedMasterPw,
-            timeoutSeconds: autoLockMinutes * 60,
-          });
-          decryptedMasterPw = ''; // Clean temporary JS variable immediately
-          setSessionToken(sToken);
-          await loadWallets();
-          setScreen('app');
-          toast('Brankas berhasil dibuka via PIN!', 'success');
-          return true;
-        }
-      } catch (err) {
-        console.error('PIN vault decryption error:', err);
-      }
-    }
-    toast('PIN yang dimasukkan salah', 'error');
-    return false;
   };
 
   // 6. Reset Entire Vault (Forgot Password Flow)

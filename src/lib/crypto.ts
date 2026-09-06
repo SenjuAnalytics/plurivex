@@ -6,17 +6,6 @@ import { invoke } from "@tauri-apps/api/core";
  * to the Rust core backend, ensuring zero key exposure in webview memory.
  */
 
-export async function encrypt(plaintext: string, password: string): Promise<string> {
-  return await invoke<string>("vault_encrypt", { plaintext, password });
-}
-
-export async function encryptBatch(plaintexts: string[], password: string): Promise<string[]> {
-  return await invoke<string[]>("vault_encrypt_batch", { plaintexts, password });
-}
-
-export async function decrypt(blob: string, password: string): Promise<string> {
-  return await invoke<string>("vault_decrypt", { blob, password });
-}
 
 export async function createVerificationToken(password: string): Promise<string> {
   return await invoke<string>("vault_create_token", { password });

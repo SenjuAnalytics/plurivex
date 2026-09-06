@@ -60,9 +60,8 @@ impl SessionManager {
             timeout_seconds: timeout,
         };
 
-        if let Ok(mut guard) = self.session.lock() {
-            *guard = Some(new_session);
-        }
+        let mut guard = self.session.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = Some(new_session);
 
         session_token
     }
@@ -70,9 +69,8 @@ impl SessionManager {
     /// Lock the vault immediately: drops active session (zeroizing master_key)
     /// and terminates any ongoing recovery sessions.
     pub fn lock(&self) {
-        if let Ok(mut guard) = self.session.lock() {
-            *guard = None;
-        }
+        let mut guard = self.session.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = None;
         let _ = crate::core::wallets::recovery_session::clear_recovery_session("");
     }
 
@@ -81,10 +79,7 @@ impl SessionManager {
         if session_token.is_empty() {
             return false;
         }
-        let mut guard = match self.session.lock() {
-            Ok(g) => g,
-            Err(_) => return false,
-        };
+        let mut guard = self.session.lock().unwrap_or_else(|e| e.into_inner());
 
         if let Some(ref mut sess) = *guard {
             if sess.session_token != session_token {
@@ -115,10 +110,7 @@ impl SessionManager {
             return Err("Session token cannot be empty".to_string());
         }
 
-        let mut guard = self
-            .session
-            .lock()
-            .map_err(|_| "Session mutex poisoned".to_string())?;
+        let mut guard = self.session.lock().unwrap_or_else(|e| e.into_inner());
 
         let sess = guard
             .as_mut()
@@ -155,10 +147,7 @@ impl SessionManager {
 
     /// Check if vault is locked
     pub fn is_locked(&self) -> bool {
-        let guard = match self.session.lock() {
-            Ok(g) => g,
-            Err(_) => return true,
-        };
+        let guard = self.session.lock().unwrap_or_else(|e| e.into_inner());
         guard.is_none()
     }
 }
