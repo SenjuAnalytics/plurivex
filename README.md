@@ -119,7 +119,7 @@ plurivex/
 │   │   │   ├── execution/                # [Roadmap Stub] Transaction queue & dry-run simulation
 │   │   │   ├── network/                  # [Roadmap Stub] Proxy rotator & RPC latency hedging
 │   │   │   ├── notifications/            # [Roadmap Stub] Webhook alerts (Discord/Slack)
-│   │   │   └── archive/                  # [Roadmap Stub] Portable encrypted .plurix archive
+│   │   │   └── archive/                  # [Roadmap Stub] Portable encrypted .plurivex archive
 │   │   ├── db/                           # Migrasi basis data SQLite
 │   │   │   ├── migrations.rs             # [Live] Skema migrasi SQLite lokal
 │   │   │   └── schema.rs                 # [Live] Konstanta nama tabel

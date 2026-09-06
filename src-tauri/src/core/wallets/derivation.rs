@@ -107,11 +107,18 @@ pub fn evm_address_from_private_key(pk_bytes: &[u8; 32]) -> Result<(String, Stri
     Ok((address, private_key_hex))
 }
 
-/// Derive Solana address and Base58 secret key from 32-byte seed
-pub fn solana_credentials_from_seed(seed_32: &[u8; 32]) -> (String, String) {
+/// Derive ONLY the Solana Base58 public address from 32-byte seed
+pub fn solana_address_only(seed_32: &[u8; 32]) -> String {
     let signing_key = EdSigningKey::from_bytes(seed_32);
     let verifying_key = signing_key.verifying_key();
-    let sol_address = bs58::encode(verifying_key.as_bytes()).into_string();
+    bs58::encode(verifying_key.as_bytes()).into_string()
+}
+
+/// Derive Solana address and Base58 secret key from 32-byte seed
+pub fn solana_credentials_from_seed(seed_32: &[u8; 32]) -> (String, String) {
+    let sol_address = solana_address_only(seed_32);
+    let signing_key = EdSigningKey::from_bytes(seed_32);
+    let verifying_key = signing_key.verifying_key();
 
     // 64-byte keypair (32 bytes secret + 32 bytes public) standard in Solana web3
     let mut keypair_bytes = [0u8; 64];
@@ -523,21 +530,60 @@ pub fn derive_dual_credentials_batch_native(
 }
 
 /// Universal public-only address derivation supporting seed phrase, EVM hex key, and Solana Base58 key.
-/// Zero-RAM-leakage: Private keys are never returned across IPC.
+/// Zero-RAM-leakage: Private keys are never returned across IPC or allocated as strings in heap.
 pub fn derive_public_addresses_native(
     secret: &str,
     wallet_type: &str,
 ) -> Result<PublicAddressesOnly, String> {
-    if wallet_type == "seed" {
-        derive_public_addresses_only_native(secret)
-    } else {
-        let creds = derive_dual_credentials_native(secret, wallet_type)?;
-        Ok(PublicAddressesOnly {
-            evm_address: creds.evm_address,
-            sol_address: creds.sol_address,
-            btc_address: creds.btc_address,
-            btc_legacy_address: creds.btc_legacy_address,
-        })
+    match wallet_type {
+        "seed" => derive_public_addresses_only_native(secret),
+        "pk" => {
+            let t = secret.trim();
+            let clean = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")).unwrap_or(t);
+            let bytes = hex::decode(clean).map_err(|e| format!("Invalid hex private key: {}", e))?;
+            if bytes.len() != 32 {
+                return Err(format!("EVM private key must be 32 bytes (64 hex characters), got {}", bytes.len()));
+            }
+            let mut pk_arr = Zeroizing::new([0u8; 32]);
+            pk_arr.copy_from_slice(&bytes);
+            let addr = evm_address_only(&pk_arr)?;
+            Ok(PublicAddressesOnly {
+                evm_address: Some(addr),
+                sol_address: None,
+                btc_address: None,
+                btc_legacy_address: None,
+            })
+        }
+        "sol_pk" => {
+            let t = secret.trim();
+            let bytes = bs58::decode(t)
+                .into_vec()
+                .map_err(|e| format!("Invalid Base58 Solana key: {}", e))?;
+            let sol_addr = if bytes.len() == 64 {
+                bs58::encode(&bytes[32..64]).into_string()
+            } else if bytes.len() == 32 {
+                let mut seed_32 = Zeroizing::new([0u8; 32]);
+                seed_32.copy_from_slice(&bytes);
+                solana_address_only(&seed_32)
+            } else {
+                return Err(format!("Invalid Solana private key length: {}", bytes.len()));
+            };
+            Ok(PublicAddressesOnly {
+                evm_address: None,
+                sol_address: Some(sol_addr),
+                btc_address: None,
+                btc_legacy_address: None,
+            })
+        }
+        _ => {
+            let creds = derive_dual_credentials_native(secret, wallet_type)?;
+            Ok(PublicAddressesOnly {
+                evm_address: creds.evm_address,
+                sol_address: creds.sol_address,
+                btc_address: creds.btc_address,
+                btc_legacy_address: creds.btc_legacy_address,
+            })
+        }
     }
 }
 
@@ -625,13 +671,34 @@ mod tests {
 
     #[test]
     fn test_public_addresses_only_derivation_seed_and_batch() {
+        // 1. Seed phrase
         let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        let pub_only = derive_public_addresses_native(mnemonic, "seed").expect("Public derivation failed");
-        assert_eq!(pub_only.evm_address.unwrap().to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
-        assert_eq!(pub_only.sol_address.unwrap(), "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+        let pub_seed = derive_public_addresses_native(mnemonic, "seed").expect("Public derivation failed");
+        assert_eq!(pub_seed.evm_address.unwrap().to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
+        assert_eq!(pub_seed.sol_address.unwrap(), "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
 
-        let batch = derive_public_addresses_batch_native(&[mnemonic.to_string()], "seed");
-        assert_eq!(batch.len(), 1);
+        // 2. EVM hex private key
+        let hex_pk = "0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+        let pub_pk = derive_public_addresses_native(hex_pk, "pk").expect("PK derivation failed");
+        assert_eq!(pub_pk.evm_address.unwrap(), "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23");
+        assert!(pub_pk.sol_address.is_none());
+
+        // 3. Solana Base58 private key
+        let sol_raw = [1u8; 32];
+        let sol_b58 = bs58::encode(&sol_raw).into_string();
+        let pub_sol = derive_public_addresses_native(&sol_b58, "sol_pk").expect("Solana derivation failed");
+        assert_eq!(pub_sol.sol_address.unwrap(), "AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9");
+        assert!(pub_sol.evm_address.is_none());
+
+        // 4. Batch derivation
+        let batch = derive_public_addresses_batch_native(
+            &[mnemonic.to_string(), hex_pk.to_string(), sol_b58.clone()],
+            "seed",
+        );
+        assert_eq!(batch.len(), 3);
         assert!(batch[0].is_some());
+        // second and third are none when expected as seed, which is intended behavior
+        assert!(batch[1].is_none());
+        assert!(batch[2].is_none());
     }
 }

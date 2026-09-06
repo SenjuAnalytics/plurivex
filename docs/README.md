@@ -27,10 +27,10 @@ Katalog dokumen arsitektur. **Semua file di folder ini di-track Git** (lihat keb
 **1. Tree-first itu kontrak, bukan sekadar pohon.**
 Setiap stub wajib membawa penanda yang bisa dicari mesin:
 ```rust
-/// TODO(plurix): Planned scaffold module for Phase N <nama fase> (tree-first architecture).
+/// TODO(plurivex): Planned scaffold module for Phase N <nama fase> (tree-first architecture).
 pub struct FooService;
 ```
-Alasannya: `pub struct Foo;` tidak bisa di-grep sebagai pekerjaan tertunda; `TODO(plurix):` bisa.
+Alasannya: `pub struct Foo;` tidak bisa di-grep sebagai pekerjaan tertunda; `TODO(plurivex):` bisa.
 Audit terkini: **9 dari 10** stub bertanda. Yang belum: `core/vault/service.rs`.
 
 **2. Label `[Live]` / `[Scaffold]` di README wajib sesuai isi pohon.**

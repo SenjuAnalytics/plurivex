@@ -1,1 +1,1 @@
-pub mod plurix;
+pub mod plurivex;

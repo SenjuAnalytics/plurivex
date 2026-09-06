@@ -912,6 +912,24 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Menambahkan badge visual `SIMULATOR PREVIEW` pada header UI dan memperbarui pesan notifikasi order untuk menegaskan bahwa DEX batch swap saat ini berjalan dalam mode simulasi / dry-run preview (mesin on-chain routing dijadwalkan pada Fase 4).
     - **Total Pengujian**: **54 unit test** (53 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
+21. **🏷️ Standarisasi Plurivex, Address-Only PK/Solana Derivation, & Penyempurnaan UX Simulasi DEX**
+    - **Standarisasi Menyeluruh Plurix ➔ Plurivex**:
+      - Memperbarui modul arsip: `src-tauri/src/core/archive/plurix.rs` ➔ `plurivex.rs`, `PlurixArchive` ➔ `PlurivexArchive`, dan `pub mod plurivex;`.
+      - Menyelaraskan seluruh penanda scaffold tree-first dari `TODO(plurix):` menjadi `TODO(plurivex):` di 10 modul domain Rust (`execution/queue.rs`, `simulator.rs`, `sweeper.rs`, `trader.rs`, `network/hedging.rs`, `proxy.rs`, `rpc_manager.rs`, `notifications/webhook.rs`, `vault/service.rs`, `archive/plurivex.rs`).
+      - Memperbarui format file arsip portabel dari `.plurix` ke `.plurivex` pada `README.md`, `PLURIVEX_MASTER_FEATURE_SPEC.md`, dan `PLURIVEX_IMPLEMENTATION_MATRIX.md`.
+      - Memperbarui ID gradient pada `public/vite.svg` menjadi `plurivexP` dan `plurivexSlash`.
+    - **Zero-Allocation Public-Only Derivation untuk `pk` & `sol_pk` (`derivation.rs`)**:
+      - Cabang `pk` di `derive_public_addresses_native` kini langsung menggunakan `evm_address_only(&pk_arr)` dengan zeroized buffer tanpa membuat struct `DualCredentials` atau alokasi string hex private key di heap.
+      - Cabang `sol_pk` kini murni mengekstrak 32-byte public key Base58 via `solana_address_only` tanpa alokasi private key string.
+      - Unit test `test_public_addresses_only_derivation_seed_and_batch` diperluas untuk menguji dan memvalidasi alamat yang dihasilkan dari seed, EVM hex key, dan Solana Base58 key.
+    - **Refinement Fallback Native Extractor (`extract.ts`)**:
+      - `smartNormalizeInputNative` kini langsung mengembalikan array hasil dari `vault_extract_credentials` (termasuk jika kosong `[]`), dan hanya melakukan fallback ke regex JS jika terjadi exception/error pada IPC.
+    - **Penyelarasan DEX Trader Simulator UI & CSS (`DexBatchTrader.tsx`, `sweeper.css`)**:
+      - Menambahkan kelas CSS `.dex-badge-warning` dengan styling warning badge.
+      - Memperbarui label tombol utama menjadi `Simulate Batch Buy / Sell` dan status eksekusi menjadi `Simulating Orders…`.
+    - **Total Pengujian**: **54 unit test** lolos (53 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite build bersih.
+
+
 
 
 

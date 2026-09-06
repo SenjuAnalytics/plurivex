@@ -249,13 +249,14 @@ export function smartNormalizeInput(raw: string): string[] {
 export async function smartNormalizeInputNative(raw: string): Promise<string[]> {
   try {
     const extracted = await invoke<string[]>("vault_extract_credentials", { text: raw });
-    if (extracted && extracted.length > 0) {
+    if (Array.isArray(extracted)) {
       return extracted;
     }
   } catch (err) {
-    console.warn("Native Rust extraction fallback to JS:", err);
+    console.warn("Native Rust extraction failed, falling back to JS regex:", err);
+    return smartNormalizeInput(raw);
   }
-  return smartNormalizeInput(raw);
+  return [];
 }
 
 export function countByType(wallets: string[]) {

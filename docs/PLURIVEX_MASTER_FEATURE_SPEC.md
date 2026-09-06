@@ -30,7 +30,7 @@ Untuk menjamin kenyamanan operasional dan meminimalisir risiko kesalahan klik (*
 | Mode Operasi | Deskripsi & Hak Akses | Fitur yang Aktif | Tingkat Kontrol Transaksi |
 | :--- | :--- | :--- | :---: |
 | 🟢 **Read-Only Audit Mode** *(Default)* | Mode penjelajahan aman. Pengguna dapat membiarkan aplikasi terbuka sepanjang hari untuk memantau saldo. Seluruh fungsi penyiaran transaksi dan sweeping **dinonaktifkan secara ketat**. | Scan saldo massal, valuasi USD/IDR, cek token sekunder, analisis akun Solana, explorer hub, deteksi token phishing, PnL tracker. | **Mode Baca Saja (Tanpa Hak Siar Transaksi)** |
-| 🔐 **Secure Vault Mode** | Mode pengelolaan identitas kunci kriptografi. Diperlukan konfirmasi Master Password sebelum membuka kredensial sensitif. | Impor/ekspor brankas, batch wallet generator, perbaikan typo seed phrase, pemindaian HD path, edit tag/folder, migrasi arsip `.plurix`. | **Akses Kredensial Terenkripsi** |
+| 🔐 **Secure Vault Mode** | Mode pengelolaan identitas kunci kriptografi. Diperlukan konfirmasi Master Password sebelum membuka kredensial sensitif. | Impor/ekspor brankas, batch wallet generator, perbaikan typo seed phrase, pemindaian HD path, edit tag/folder, migrasi arsip `.plurivex`. | **Akses Kredensial Terenkripsi** |
 | ⚡ **Execution Mode** | Mode operasi tempur untuk pengiriman transaksi on-chain. Tombol aksi berwarna oranye/merah tegas dengan peringatan *High-Assurance* dan otorisasi kata sandi sebelum transaksi disiarkan. | Batch Sweeper, DEX Batch Trader, Batch Disperser, Solana Rent Reclaimer, Gasless Permit Sweeper, Mass Airdrop Claimer. | **Eksekusi Transaksi Berizin Khusus** |
 
 ---
@@ -271,8 +271,8 @@ Seluruh 60 kapabilitas fungsional Plurivex diklasifikasikan ke dalam **7 Pilar S
 #### 59. Multi-Channel Webhook Notifier (Discord, Slack, & Custom Webhook)
 * **Deskripsi:** Mengirimkan kartu notifikasi laporan transaksi (*embed message*) otomatis ke channel Discord, Slack, atau server webhook kustom milik tim/komunitas begitu ada dana baru masuk atau transaksi sweeper selesai.
 
-#### 60. Encrypted Portable Vault Archive (`.plurix` One-Click Backup & Migration)
-* **Deskripsi:** Membuat satu berkas arsip tunggal berformat `.plurix` yang terenkripsi ganda dengan kata sandi cadangan (*recovery passphrase*). Berkas ini mengemas seluruh database dompet, label/tag, riwayat transaksi, dan pengaturan RPC, memungkinkan migrasi brankas ke PC/laptop baru hanya dalam 1 klik.
+#### 60. Encrypted Portable Vault Archive (`.plurivex` One-Click Backup & Migration)
+* **Deskripsi:** Membuat satu berkas arsip tunggal berformat `.plurivex` yang terenkripsi ganda dengan kata sandi cadangan (*recovery passphrase*). Berkas ini mengemas seluruh database dompet, label/tag, riwayat transaksi, dan pengaturan RPC, memungkinkan migrasi brankas ke PC/laptop baru hanya dalam 1 klik.
 
 ---
 
@@ -345,7 +345,7 @@ Klasifikasi Status:
 | **57** | Realtime Multi-Currency Valuation (USD/IDR) | Pilar 7: Data & Portabilitas | 🟢 **Complete & Live** | Realtime Pricing |
 | **58** | Local Vault Net Worth Snapshot & PnL History | Pilar 7: Data & Portabilitas | ⏳ Planned (Fase 5) | Local Analytics |
 | **59** | Multi-Channel Webhook Notifier (Discord / Slack / Custom Webhook) | Pilar 7: Data & Portabilitas | ⏳ Planned (Fase 5) | Broadcast Alerts |
-| **60** | Encrypted Portable Vault Archive (`.plurix`) | Pilar 7: Data & Portabilitas | ⏳ Planned (Fase 5) | Encrypted Migration |
+| **60** | Encrypted Portable Vault Archive (`.plurivex`) | Pilar 7: Data & Portabilitas | ⏳ Planned (Fase 5) | Encrypted Migration |
 
 ---
 
@@ -462,7 +462,7 @@ Roadmap di bawah dirancang untuk memastikan **Zero Architectural Rewrites**, di 
 * **Urutan 10 (Fitur #37): Tax-Loss Harvesting & Dead Token Burner** — Pembakar koin rugpull ke `0x...dEaD` + ekspor laporan pajak.
 * **Urutan 11 (Fitur #58): Local Vault Net Worth Snapshot & Historical PnL Tracker** — Grafik tren kekayaan lokal di SQLite.
 * **Urutan 12 (Fitur #59): Multi-Channel Webhook Notifier (Discord / Slack / Custom Webhook)** — Laporan otomatis ke grup tim Anda.
-* **Urutan 13 (Fitur #60): Encrypted Portable Vault Archive (`.plurix`):** Cadangan dan migrasi 1-klik ke laptop baru.
+* **Urutan 13 (Fitur #60): Encrypted Portable Vault Archive (`.plurivex`):** Cadangan dan migrasi 1-klik ke laptop baru.
 
 ---
 
@@ -565,7 +565,7 @@ src-tauri/src/
 │   │   ├── pnl.rs             # Rekam jejak snapshot kekayaan vault & pelacak PnL (#58)
 │   │   └── mod.rs
 │   ├── archive/
-│   │   ├── plurix.rs          # Enkripsi & migrasi arsip portabel (.plurix) (#60)
+│   │   ├── plurivex.rs        # Enkripsi & migrasi arsip portabel (.plurivex) (#60)
 │   │   └── mod.rs
 │   └── mod.rs
 ├── db/
@@ -592,7 +592,7 @@ Agar arsitektur benar-benar memenuhi prinsip Hexagonal (Inversion of Control):
    * `TransactionBroadcaster`: Abstraksi penyiaran transaksi bertanda tangan ke mempool / validator.
    * `PriceOracle`: Abstraksi konversi kurs mata uang pasar real-time.
    * `ClipboardService`: Abstraksi pembersih papan klip level sistem operasi.
-   * `ArchiveStore`: Abstraksi ekspor/impor terenkripsi `.plurix`.
+   * `ArchiveStore`: Abstraksi ekspor/impor terenkripsi `.plurivex`.
 
 ---
 
@@ -822,7 +822,7 @@ Setiap fitur pada roadmap dinyatakan **Selesai (Done)** hanya jika memenuhi krit
 | **Fase 2: Infrastruktur & Anti-Scam** | Multi-RPC race engine memilih latensi terendah, simulasi dry-run mendeteksi revert sebelum broadcast. | Latensi switching RPC < 150ms. | Proteksi IP proksi dengan mitigasi kebocoran DNS (*DNS Leak Mitigation Required*). | Jika seluruh RPC timeout, transaksi ditahan di status `Validated` agar tidak dibroadcast sebelum simulasi jaringan lolos. |
 | **Fase 3: Smart Contract & Sweeper** | Sweeping atomik multi-token EVM & Solana memotong fee 0.70% ke Treasury secara akurat. | Broadcast 100 transaksi < 30 detik. | Penandatanganan `Just-in-Time` di Rust `SecureBuffer`. Tidak ada kebocoran plaintext ke webview. | Revert on-chain memicu auto-pause antrean untuk mencegah pengurasan saldo gas konyol. |
 | **Fase 4: Otomasi Airdrop & Anti-Sybil** | Jeda acak 5–60s aktif, taint graph memvalidasi tidak ada klasterisasi transfer antar-dompet lokal. | Render taint graph 1.000 nodes tetap 60 FPS. | Deteksi alamat deposit CEX meminimalisir risiko kontaminasi silang berdasarkan aturan deteksi lokal. | Peringatan resiko Sybil langsung memblokir eksekusi hingga konfirmasi manual user. |
-| **Fase 5: Forensik Elit & Ekosistem** | Dekripsi keystore JSON mutasi kata sandi berhasil, arsip `.plurix` terenkripsi ganda dapat dipulihkan di PC baru. | Dekripsi arsip < 5 detik. | Kata sandi arsip diverifikasi via Argon2id (bukan SHA-256 biasa). | Kerusakan berkas arsip menolak ekstraksi dan menjaga integritas database lokal eksisting. |
+| **Fase 5: Forensik Elit & Ekosistem** | Dekripsi keystore JSON mutasi kata sandi berhasil, arsip `.plurivex` terenkripsi ganda dapat dipulihkan di PC baru. | Dekripsi arsip < 5 detik. | Kata sandi arsip diverifikasi via Argon2id (bukan SHA-256 biasa). | Kerusakan berkas arsip menolak ekstraksi dan menjaga integritas database lokal eksisting. |
 
 ---
 

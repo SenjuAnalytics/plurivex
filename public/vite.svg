@@ -6,14 +6,14 @@
       <stop offset="100%" stop-color="#07070c" />
     </radialGradient>
 
-    <linearGradient id="plurixP" x1="100" y1="80" x2="400" y2="440" gradientUnits="userSpaceOnUse">
+    <linearGradient id="plurivexP" x1="100" y1="80" x2="400" y2="440" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#818cf8" />
       <stop offset="35%" stop-color="#6366f1" />
       <stop offset="70%" stop-color="#8b5cf6" />
       <stop offset="100%" stop-color="#a855f7" />
     </linearGradient>
 
-    <linearGradient id="plurixSlash" x1="200" y1="200" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+    <linearGradient id="plurivexSlash" x1="200" y1="200" x2="440" y2="440" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#38bdf8" />
       <stop offset="50%" stop-color="#6366f1" />
       <stop offset="100%" stop-color="#c084fc" />
@@ -54,7 +54,7 @@
        C 325.4 265 350 240.4 350 210
        C 350 179.6 325.4 155 295 155
        Z"
-    fill="url(#plurixP)"
+    fill="url(#plurivexP)"
     filter="url(#neonGlow)"
   />
 
@@ -66,7 +66,7 @@
        C 445 389 444 372 432 360
        L 295 205
        Z"
-    fill="url(#plurixSlash)"
+    fill="url(#plurivexSlash)"
     opacity="0.95"
   />
 

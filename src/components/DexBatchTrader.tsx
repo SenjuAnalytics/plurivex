@@ -35,9 +35,9 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
       {/* 1. Header Banner */}
       <div className="dex-header">
         <div className="dex-title-box">
-          <div className="flex items-center gap-2 mb-1">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
             <span className="dex-badge">MULTI-WALLET SWAP ENGINE</span>
-            <span className="badge badge-warning">SIMULATOR PREVIEW</span>
+            <span className="dex-badge-warning">SIMULATOR PREVIEW</span>
           </div>
           <h3>DEX Batch Trader</h3>
           <p>Simulation Preview: Execute parallel buys and sells across Uniswap, PancakeSwap, & Raydium (on-chain DEX routing engine in development).</p>
@@ -172,7 +172,7 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
           onClick={handleExecuteBatchTrade}
           disabled={isExecuting}
         >
-          {isExecuting ? "Broadcasting Transactions…" : <><IconZap size={13} /> Execute Batch {tradeAction === "buy" ? "Buy" : "Sell"} ({activeWalletsCount} Wallets)</>}
+          {isExecuting ? "Simulating Orders…" : <><IconZap size={13} /> Simulate Batch {tradeAction === "buy" ? "Buy" : "Sell"} ({activeWalletsCount} Wallets)</>}
         </button>
       </div>
     </div>

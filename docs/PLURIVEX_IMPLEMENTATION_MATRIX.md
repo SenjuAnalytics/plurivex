@@ -87,7 +87,7 @@ Dokumen ini merupakan turunan operasional 1:1 (*direct downstream operational tr
 | **57** | Realtime Multi-Currency Valuation (USD/IDR & 11 Fiats) | `core/scanner/pricing.rs` & `adapters/pricing/coingecko.rs` (Live Source of Truth) | `WalletDetail.tsx` & `MainApp.tsx` | `get_token_prices` [Live IPC] | CoinGecko Oracle + Offline Stale Cache & Fallback | 🟢 Complete & Live (Fase 0) |
 | **58** | Local Vault Net Worth Snapshot & PnL History | `core/analytics/pnl.rs` (Planned Target) | `PnlTrackerModal.tsx` | `query_historical_pnl` [Planned IPC] | Local SQLite Portfolio Snapshot & Chart Render | ⏳ Planned (Fase 5) |
 | **59** | Multi-Channel Webhook Notifier (Discord / Slack / Custom Webhook) | `core/notifications/webhook.rs` (Planned Target) | `WebhookSettingsModal.tsx`| `send_test_webhook` [Planned IPC] | Embed Card Payload & Webhook Rate-Limit Test | ⏳ Planned (Fase 5) |
-| **60** | Encrypted Portable Vault Archive (`.plurix`) | `core/archive/plurix.rs` (Planned Target) | `BackupMigrationModal.tsx`| `export_plurix_archive` [Planned IPC] | Argon2id Recovery Passphrase & Tar.Gz Extract | ⏳ Planned (Fase 5) |
+| **60** | Encrypted Portable Vault Archive (`.plurivex`) | `core/archive/plurivex.rs` (Planned Target) | `BackupMigrationModal.tsx`| `export_plurivex_archive` [Planned IPC] | Argon2id Recovery Passphrase & Tar.Gz Extract | ⏳ Planned (Fase 5) |
 
 ---
 
