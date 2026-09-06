@@ -174,6 +174,15 @@ export const RepairWorkspace: React.FC<RepairWorkspaceProps> = ({
     };
   }, [activeSession?.sessionId, activeSession?.status, analysis?.targetMatch, setAnalysis, toast, enqueuePhrases]);
 
+  // Clean up in-memory recovery session secrets upon unmount (Deliver-then-Wipe finalizer)
+  useEffect(() => {
+    return () => {
+      if (activeSession?.sessionId) {
+        invoke("clear_recovery_session", { sessionId: activeSession.sessionId }).catch(() => {});
+      }
+    };
+  }, [activeSession?.sessionId]);
+
   const handleStartSession = async () => {
     if (!phrase.trim()) return;
     try {

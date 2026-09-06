@@ -8,7 +8,7 @@ pub fn check_target_match(
     word: &str,
 ) -> Option<TargetAddressMatch> {
     if let Ok(creds) =
-        crate::core::wallets::derivation::derive_dual_credentials_native(test_phrase, "seed")
+        crate::core::wallets::derivation::derive_public_addresses_only_native(test_phrase)
     {
         let is_evm = target.starts_with("0x") || target.len() == 42;
         let is_btc =

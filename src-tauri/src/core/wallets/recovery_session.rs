@@ -52,6 +52,9 @@ pub fn start_in_memory_session(
     target_address: Option<String>,
     _search_type: String,
 ) -> Result<RecoverySessionStatusResponse, String> {
+    // Purge any lingering secrets/solutions from previous sessions (Z5)
+    clear_session_secrets();
+
     let session_id = format!("ses_{}", hex::encode(rand::random::<[u8; 8]>()));
 
     let tokens: Vec<&str> = phrase.split_whitespace().collect();
@@ -173,6 +176,9 @@ pub fn clear_session_secrets() {
     }
     {
         let mut match_guard = safe_lock(&CACHED_TARGET_MATCH);
+        if let Some(ref mut m) = *match_guard {
+            crate::core::security::memory::secure_zero_string(&mut m.phrase);
+        }
         *match_guard = None;
     }
     {
@@ -182,6 +188,16 @@ pub fn clear_session_secrets() {
         }
         sols.clear();
     }
+}
+
+/// Clear only the active raw input phrase from RAM on normal worker completion,
+/// preserving cached solutions and target matches for frontend polling (R1 Deliver-then-Wipe)
+pub fn clear_active_phrase_secret() {
+    let mut phrase = safe_lock(&ACTIVE_RAW_PHRASE);
+    if let Some(ref mut p) = *phrase {
+        crate::core::security::memory::secure_zero_string(p);
+    }
+    *phrase = None;
 }
 
 pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
@@ -479,12 +495,15 @@ pub fn run_dual_word_session_worker(
             }
         }
 
-        // Zeroize sensitive session parameters if cancelled or completed normally
-        if CANCEL_FLAG.load(Ordering::SeqCst)
-            || (!PAUSE_FLAG.load(Ordering::SeqCst)
-                && SESSION_GENERATION.load(Ordering::Relaxed) == generation)
-        {
+        // Deliver-then-Wipe (R1):
+        // On cancellation, clear all secrets immediately.
+        // On normal completion, only zeroize raw input phrase, preserving cached solutions and target match for frontend polling.
+        if CANCEL_FLAG.load(Ordering::SeqCst) {
             clear_session_secrets();
+        } else if !PAUSE_FLAG.load(Ordering::SeqCst)
+            && SESSION_GENERATION.load(Ordering::Relaxed) == generation
+        {
+            clear_active_phrase_secret();
         }
     });
 }
@@ -517,5 +536,31 @@ mod tests {
         // Test Cancel
         let cancel_res = request_cancel_session(&res.session_id).unwrap();
         assert!(cancel_res);
+    }
+
+    #[test]
+    fn test_deliver_then_wipe_preserves_solutions_on_fast_complete() {
+        // 1 missing word = 2048 combinations, completes quickly
+        let phrase =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?"
+                .to_string();
+        let res = start_in_memory_session(phrase, None, "single_word".to_string()).unwrap();
+
+        // Give worker a brief moment to complete all 2048 combinations
+        std::thread::sleep(std::time::Duration::from_millis(150));
+
+        let status = get_live_session_status(&res.session_id).unwrap();
+        assert_eq!(status.status, "completed");
+        // Verify solutions are preserved for frontend polling
+        assert!(status.solutions_count > 0);
+        assert!(!status.recent_solutions.is_empty());
+        // Verify raw input phrase was wiped from RAM
+        assert!(safe_lock(&ACTIVE_RAW_PHRASE).is_none());
+
+        // Now verify frontend explicit cleanup wipes everything
+        let clear_res = clear_recovery_session(&res.session_id).unwrap();
+        assert!(clear_res);
+        assert!(safe_lock(&CACHED_SOLUTIONS).is_empty());
+        assert!(safe_lock(&CACHED_TARGET_MATCH).is_none());
     }
 }

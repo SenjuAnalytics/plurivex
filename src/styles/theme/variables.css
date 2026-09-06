@@ -4,7 +4,6 @@
    One token set. No !important. No duplicate rules.
    ========================================================================== */
 
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
   /* Surfaces — Slate Anthracite Night */
@@ -87,10 +86,10 @@
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-accent: 0 0 20px rgba(201, 207, 216, 0.12);
 
-  /* Fonts */
-  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
-  --font: "Inter", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Fonts — Offline-Safe Native System Font Hierarchy */
+  --font-display: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", "Roboto Mono", Menlo, Monaco, Consolas, ui-monospace, monospace;
 
   /* Motion */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);

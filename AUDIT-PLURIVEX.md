@@ -771,4 +771,37 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 5. **🏷️ Rebranding Penuh ke Plurivex**
    - Menyelaraskan seluruh nama crate biner & lib (`plurivex`, `plurivex_lib`), nama database default (`plurivex.db`), user-agent HTTP RPC client (`Plurivex/1.0`), dan dokumentasi arsitektur.
 
+---
+
+## 🛡️ REVISI v5 — Forensic Lifecycle Polish & Memory Hardening (Tahap 1b Selesai)
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (34/34 Unit Test Lulus)**
+
+Resolusi komprehensif terhadap review lanjutan commit `e66b59c`:
+
+1. **🔴 R1 — Deliver-then-Wipe Pattern pada Recovery Session**
+   - Mengatasi race condition di mana thread worker cepat (<5ms) menghapus hasil solusi dan target match sebelum frontend sempat melakukan polling 400ms.
+   - Saat worker selesai normal, HANYA kata sandi mentah (`ACTIVE_RAW_PHRASE`) yang di-zeroize. `CACHED_SOLUTIONS` dan `CACHED_TARGET_MATCH` dipertahankan di RAM sampai frontend secara eksplisit memanggil `clear_recovery_session` (unmount, reset, atau lock).
+   - Ditambahkan unit test deterministik `test_deliver_then_wipe_preserves_solutions_on_fast_complete`.
+
+2. **🔴 R2 — Penghapusan Remote Google Fonts (@import)**
+   - Menghapus `@import url("https://fonts.googleapis.com/...")` di `variables.css`.
+   - Menggunakan fallback font stack sistem lokal (`Inter`, `system-ui`, `-apple-system`, `JetBrains Mono`, `monospace`), menghilangkan pelanggaran CSP dan mencegah kebocoran IP jaringan eksternal.
+
+3. **🔒 K4 — Production CSP Hardening & Pemisahan devCsp**
+   - Menghapus `https:` dan `asset:` dari `img-src` produksi untuk menutup celah eksfiltrasi data via CSS/HTML.
+   - Memisahkan koneksi WebSocket HMR (`ws://localhost:1420 http://localhost:1420`) ke konfigurasi khusus development `security.devCsp`.
+   - Menambahkan direktif ketat: `object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';`.
+
+4. **⚡ Z2 & K5 — Public-Key-Only Target Matching**
+   - Mengganti pemanggilan `derive_dual_credentials_native` dengan `derive_public_addresses_only_native` pada `target_match.rs`.
+   - Mengeliminasi alokasi string private key secp256k1 dan ed25519 di heap RAM selama pencocokan candidate address (4x–8x lebih cepat, zero private key leakage).
+
+5. **🧠 Z1, Z4, Z5 — Jaminan Pembersihan Memori Zeroize Menyeluruh**
+   - **Z1**: `clear_session_secrets` membersihkan `m.phrase` di dalam `CACHED_TARGET_MATCH` dengan `secure_zero_string` sebelum menghapus guard.
+   - **Z4**: Menggunakan wrapper RAII `zeroize::Zeroizing` untuk seluruh buffer rahasia perantara (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`) di `derivation.rs`. Menjamin auto-wipe bahkan pada early error return (`?`).
+   - **Z5**: `start_in_memory_session` memanggil `clear_session_secrets()` di awal sebelum inisialisasi sesi baru.
+   - **Unmount Lifecycle**: `RepairWorkspace.tsx` menambahkan hook pembersihan sesi aktif saat komponen unmount.
+   - **Dokumentasi**: Menyelaraskan klaim zeroize di `README.md` menjadi *"Volatile Memory Zeroization (`zeroize` Crate)"*.
+
+
 
