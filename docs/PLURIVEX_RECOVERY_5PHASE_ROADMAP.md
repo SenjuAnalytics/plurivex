@@ -94,6 +94,10 @@ Sebagian besar alat pemulihan frasa pemulihan kripto (BIP-39 mnemonic recovery) 
 - [x] **4.3 UI Kontrol Sesi & Live Progress Tracker**:
   - Progress bar persentase real-time gradien, indikator kecepatan (*combinations/detik*), hitung mundur sisa waktu (*ETA*), dan lencana status **`Zero-Disk RAM Shield`**.
   - Tombol aksi: **`⏸ Jeda (Pause)`**, **`▶ Lanjutkan (Resume)`**, dan **`✕ Batalkan`**.
+- [x] **4.4 Deliver-then-Wipe Memory Lifecycle & Zeroizing RAII Guards**:
+  - Pola Deliver-then-Wipe: Thread worker yang rampung hanya men-zeroize frasa input mentah (`ACTIVE_RAW_PHRASE`), mempertahankan solusi dan hasil target match di RAM hingga frontend selesai melakukan polling status.
+  - Pembersihan total (`clear_session_secrets`) dipicu secara eksplisit saat komponen unmount, tombol cancel/reset ditekan, atau saat memulai sesi baru.
+  - Seluruh buffer rahasia kriptografis dibungkus dengan guard `zeroize::Zeroizing` untuk menjamin volatile memory scrubbing otomatis bahkan saat terjadi early error return (`?`).
 
 ---
 
@@ -117,11 +121,13 @@ Sebagian besar alat pemulihan frasa pemulihan kripto (BIP-39 mnemonic recovery) 
 ## 🛠️ Rekam Jejak Modul yang Sudah Berhasil Diselesaikan (Foundation)
 
 1. **BTC Native SegWit (BIP-84 `bc1q...`), Legacy (BIP-44 `1...`), & WIF Generator**.
-2. **Forensic Target Address Matcher** (Pencocokan instan otomatis jika alamat publik diketahui).
+2. **Forensic Target Address Matcher** (Pencocokan instan otomatis jika alamat publik diketahui, dioptimalkan dengan `derive_public_addresses_only_native` bebas heap private key).
 3. **Smart Mnemonic Repair & Single-Word Solver** (Default `🌐 Semua Posisi` dengan 1.536 kombinasi teruji).
 4. **Hardware-Accelerated Virtual List** (Precomputed strings, 1-span rendering, zero scroll lag pada 60-120 FPS).
 5. **Clean 2-Row Stacked Card Layout** (Desain kartu modern dengan tombol ringkas `Apply`).
 6. **Encrypted Vault Storage** (SQLite terenkripsi dengan AES-256-GCM).
+7. **Strict Content Security Policy (CSP)** (Perlindungan webview tanpa dependensi font/gambar eksternal dan isolasi `devCsp`).
+8. **Volatile Memory Zeroization & Safe Mutex** (Crate `zeroize`, `compiler_fence(Ordering::SeqCst)`, dan `safe_lock` anti-poisoning).
 
 ---
 
