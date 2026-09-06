@@ -394,7 +394,7 @@ pub fn run_dual_word_session_worker(
                 base_indices
             };
 
-        let assemble_phrase = |indices: &[u16; 12]| -> String {
+        let assemble_phrase = |indices: &[u16; 12]| -> zeroize::Zeroizing<String> {
             let mut phrase = String::with_capacity(120);
             for (i, &idx) in indices.iter().enumerate() {
                 if i > 0 {
@@ -402,7 +402,7 @@ pub fn run_dual_word_session_worker(
                 }
                 phrase.push_str(word_list[idx as usize]);
             }
-            phrase
+            zeroize::Zeroizing::new(phrase)
         };
 
         if missing_word_indices.len() == 1 {
@@ -425,7 +425,7 @@ pub fn run_dual_word_session_worker(
                     {
                         let mut guard = safe_lock(&CACHED_SOLUTIONS);
                         if guard.len() < 1000 {
-                            guard.push(phrase.clone());
+                            guard.push(phrase.to_string());
                         }
                     }
                     SOLUTIONS_COUNT.fetch_add(1, Ordering::Relaxed);
@@ -477,7 +477,7 @@ pub fn run_dual_word_session_worker(
                             {
                                 let mut guard = safe_lock(&CACHED_SOLUTIONS);
                                 if guard.len() < 1000 {
-                                    guard.push(phrase.clone());
+                                    guard.push(phrase.to_string());
                                 }
                             }
                             SOLUTIONS_COUNT.fetch_add(1, Ordering::Relaxed);

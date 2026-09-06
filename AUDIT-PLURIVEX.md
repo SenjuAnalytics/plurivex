@@ -797,10 +797,11 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
    - Memisahkan koneksi WebSocket HMR (`ws://localhost:1420 http://localhost:1420`) ke konfigurasi khusus development `security.devCsp`.
    - Menghapus `@import url("https://fonts.googleapis.com/...")` di `variables.css` dan mengandalkan font stack sistem lokal offline (`Inter`, `system-ui`, `-apple-system`, `JetBrains Mono`, `monospace`).
 
-5. **🧠 Z1, Z4, Z5 — Jaminan Pembersihan Memori Zeroize Menyeluruh**
+5. **🧠 Z1, Z4, Z5, Z6 — Jaminan Pembersihan Memori Zeroize Menyeluruh**
    - **Z1**: `clear_session_secrets` membersihkan `m.phrase` di dalam `CACHED_TARGET_MATCH` dengan `secure_zero_string` sebelum menghapus guard.
    - **Z4**: Membungkus buffer rahasia perantara (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`, serta `decoded` & `raw32` pada cabang `sol_pk`) di `derivation.rs` dengan tipe RAII `zeroize::Zeroizing`. Menjamin auto-wipe pada seluruh jalur keluar fungsi termasuk early error return (`?`).
    - **Z5**: `start_in_memory_session` memanggil `clear_session_secrets()` di awal sebelum inisialisasi sesi baru.
+   - **Z6**: Mengaktifkan fitur bawaan `zeroize` pada crate `bip39` (`features = ["all-languages", "zeroize"]`) dengan dependensi `zeroize_derive 1.5.0`.
    - **Dokumentasi**: Menyelaraskan klaim zeroize di `README.md` menjadi *"Volatile Memory Zeroization (`zeroize` Crate)"*.
 
 6. **🔒 L1 — Zero-Disk & Volatile RAM Wipe saat Vault Dikunci**
@@ -818,8 +819,12 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 9. **🧪 T2 — Canonical Known-Answer Test Vector BIP-49 Resmi**
    - Menambahkan unit test resmi `test_bip49_and_bitcoin_derivation_vectors` di `derivation.rs` yang memvalidasi ketiga format alamat Bitcoin (BIP-84 `bc1q...`, BIP-49 `3...`, BIP-44 `1...`) terhadap test vector resmi BIP-49 & Ian Coleman (`abandon ... about` $\rightarrow$ `37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf`). Mengunci kebenaran kriptografis dan mencegah regresi diam-diam.
 
-10. **⚡ Z3 — Zero-Heap Overhead Phrase Assembly di Worker Loop**
-    - Mengganti alokasi `.collect::<Vec<&str>>().join(" ")` di worker recovery loop (`recovery_session.rs`) dengan closure buffer pra-alokasi `assemble_phrase(&indices)` (`String::with_capacity(120)`). Mengeliminasi pembuatan intermediate pointer vector di heap secara berulang.
+10. **⚡ Z3 — Volatile Zeroize & Pre-Allocated Phrase Buffer di Worker Loop**
+    - Mengganti alokasi `.collect::<Vec<&str>>().join(" ")` di worker recovery loop (`recovery_session.rs`) dengan closure `assemble_phrase(&indices)` yang mengembalikan `zeroize::Zeroizing<String>` (`String::with_capacity(120)`).
+    - Menghilangkan alokasi heap `Vec<&str>` perantara sekaligus menjamin string kandidat frasa di-zeroize otomatis di heap RAM setiap kali iterasi loop selesai (`Drop` RAII).
+
+11. **🚀 CI/CD — Automated GitHub Actions Verification Pipeline**
+    - Menambahkan `.github/workflows/ci.yml` yang menguji typecheck TypeScript (`tsc`), bundle frontend (`vite build`), `cargo clippy -- -D warnings`, dan seluruh unit test `cargo test` lintas platform (Ubuntu & Windows) secara otomatis pada setiap push dan pull request di branch `main`.
 
 
 
