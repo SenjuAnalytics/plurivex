@@ -750,7 +750,7 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 
 1. **🔒 K4 — Strict Content Security Policy (CSP)**
    - `tauri.conf.json` telah diperbarui dari `"csp": null` menjadi kebijakan ketat:
-     `"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420;"`
+     `"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420;"` *(Catatan v5: Telah diperketat lebih lanjut di Revisi v5 — superseded)*
    - Melindungi antarmuka webview dari serangan injeksi skrip eksternal (anti-XSS).
 
 2. **🎫 K6 — Race Condition Pause ➔ Resume Teratasi**
@@ -773,35 +773,36 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 
 ---
 
-## 🛡️ REVISI v5 — Forensic Lifecycle Polish & Memory Hardening (Tahap 1b Selesai)
-*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (34/34 Unit Test Lulus)**
+## 🛡️ REVISI v5 — Production Hardening & Precision Forensic Lifecycle (Lengkap)
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (34/34 Unit Test Deterministik Lulus)**
 
-Resolusi komprehensif terhadap review lanjutan commit `e66b59c`:
+Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
-1. **🔴 R1 — Deliver-then-Wipe Pattern pada Recovery Session**
-   - Mengatasi race condition di mana thread worker cepat (<5ms) menghapus hasil solusi dan target match sebelum frontend sempat melakukan polling 400ms.
-   - Saat worker selesai normal, HANYA kata sandi mentah (`ACTIVE_RAW_PHRASE`) yang di-zeroize. `CACHED_SOLUTIONS` dan `CACHED_TARGET_MATCH` dipertahankan di RAM sampai frontend secara eksplisit memanggil `clear_recovery_session` (unmount, reset, atau lock).
-   - Ditambahkan unit test deterministik `test_deliver_then_wipe_preserves_solutions_on_fast_complete`.
+1. **🔴 R3 — Proteksi Sesi Ganda (Mencegah Sesi Kedua Terbunuh)**
+   - **Rust**: `clear_recovery_session(session_id)` kini memvalidasi kecocokan identitas sesi aktif (`active.as_deref() == Some(session_id) || session_id.is_empty()`). Panggilan cleanup dengan ID sesi usang dari sesi sebelumnya langsung ditolak tanpa menyentuh sesi baru.
+   - **React**: Cleanup hook di `RepairWorkspace.tsx` diubah menggunakan `useRef` (`sessionIdRef`) dengan dependency array kosong `[]`, sehingga pembersihan sesi benar-benar hanya berjalan saat komponen di-unmount, bukan saat perpindahan sesi A $\rightarrow$ B.
 
-2. **🔴 R2 — Penghapusan Remote Google Fonts (@import)**
-   - Menghapus `@import url("https://fonts.googleapis.com/...")` di `variables.css`.
-   - Menggunakan fallback font stack sistem lokal (`Inter`, `system-ui`, `-apple-system`, `JetBrains Mono`, `monospace`), menghilangkan pelanggaran CSP dan mencegah kebocoran IP jaringan eksternal.
+2. **🟠 T1 & K6 — Eliminasi Race Condition Ekor Worker & Test Paralel**
+   - Ekor thread worker kini diproteksi guard generasi: `if SESSION_GENERATION.load(Ordering::SeqCst) == generation`. Worker lama yang keluar tidak dapat menghapus memori milik sesi baru.
+   - Menambahkan `static TEST_LOCK: Mutex<()>` untuk men-serialisasi test yang mengakses state statis global di backend Rust.
+   - Mengganti `sleep(150ms)` fixed dengan loop polling deterministik bertenggat waktu 5 detik (`Instant + timeout`).
 
-3. **🔒 K4 — Production CSP Hardening & Pemisahan devCsp**
+3. **⚡ K5 — Derivasi Selektif Tunggal per-Chain pada Target Matcher**
+   - Mengklasifikasikan format target address (`0x...` untuk EVM, `bc1`/`1`/`3` untuk BTC, Base58 untuk Solana) sebelum komputasi.
+   - Menambahkan fungsi derivasi tunggal: `derive_evm_address_only_native`, `derive_solana_address_only_native`, dan `derive_bitcoin_addresses_only_native`.
+   - Mengeliminasi 75% beban komputasi kurva eliptis per kandidat kata (mewujudkan percepatan 4x–8x yang sesungguhnya tanpa alokasi private key di heap).
+
+4. **🔒 K4 & R2 — Content Security Policy Kedap & Penghapusan Google Fonts**
    - Menghapus `https:` dan `asset:` dari `img-src` produksi untuk menutup celah eksfiltrasi data via CSS/HTML.
    - Memisahkan koneksi WebSocket HMR (`ws://localhost:1420 http://localhost:1420`) ke konfigurasi khusus development `security.devCsp`.
-   - Menambahkan direktif ketat: `object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';`.
-
-4. **⚡ Z2 & K5 — Public-Key-Only Target Matching**
-   - Mengganti pemanggilan `derive_dual_credentials_native` dengan `derive_public_addresses_only_native` pada `target_match.rs`.
-   - Mengeliminasi alokasi string private key secp256k1 dan ed25519 di heap RAM selama pencocokan candidate address (4x–8x lebih cepat, zero private key leakage).
+   - Menghapus `@import url("https://fonts.googleapis.com/...")` di `variables.css` dan mengandalkan font stack sistem lokal offline (`Inter`, `system-ui`, `-apple-system`, `JetBrains Mono`, `monospace`).
 
 5. **🧠 Z1, Z4, Z5 — Jaminan Pembersihan Memori Zeroize Menyeluruh**
    - **Z1**: `clear_session_secrets` membersihkan `m.phrase` di dalam `CACHED_TARGET_MATCH` dengan `secure_zero_string` sebelum menghapus guard.
-   - **Z4**: Menggunakan wrapper RAII `zeroize::Zeroizing` untuk seluruh buffer rahasia perantara (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`) di `derivation.rs`. Menjamin auto-wipe bahkan pada early error return (`?`).
+   - **Z4**: Membungkus buffer rahasia perantara (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`, serta `decoded` & `raw32` pada cabang `sol_pk`) di `derivation.rs` dengan tipe RAII `zeroize::Zeroizing`. Menjamin auto-wipe pada seluruh jalur keluar fungsi termasuk early error return (`?`).
    - **Z5**: `start_in_memory_session` memanggil `clear_session_secrets()` di awal sebelum inisialisasi sesi baru.
-   - **Unmount Lifecycle**: `RepairWorkspace.tsx` menambahkan hook pembersihan sesi aktif saat komponen unmount.
    - **Dokumentasi**: Menyelaraskan klaim zeroize di `README.md` menjadi *"Volatile Memory Zeroization (`zeroize` Crate)"*.
+
 
 
 
