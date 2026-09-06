@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   initDb,
   hasMasterPassword,
@@ -59,6 +60,7 @@ export function useAuthVault({ toast, loadWallets, wallets }: UseAuthVaultProps)
   const lock = useCallback(() => {
     setMasterPw('');
     setScreen('unlock');
+    invoke('clear_recovery_session', { sessionId: '' }).catch(() => {});
     toast('Vault dikunci demi keamanan', 'info');
   }, [toast]);
 

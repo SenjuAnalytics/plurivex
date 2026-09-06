@@ -29,6 +29,7 @@ static ACTIVE_TARGET_ADDR: std::sync::Mutex<Option<String>> = std::sync::Mutex::
 static PAUSE_FLAG: AtomicBool = AtomicBool::new(false);
 static CANCEL_FLAG: AtomicBool = AtomicBool::new(false);
 static CURRENT_INDEX: AtomicUsize = AtomicUsize::new(0);
+static SESSION_START_INDEX: AtomicUsize = AtomicUsize::new(0);
 static SOLUTIONS_COUNT: AtomicUsize = AtomicUsize::new(0);
 static TOTAL_COMBINATIONS: AtomicUsize = AtomicUsize::new(0);
 static SESSION_GENERATION: AtomicUsize = AtomicUsize::new(0);
@@ -83,6 +84,7 @@ pub fn start_in_memory_session(
         PAUSE_FLAG.store(false, Ordering::SeqCst);
         CANCEL_FLAG.store(false, Ordering::SeqCst);
         CURRENT_INDEX.store(0, Ordering::SeqCst);
+        SESSION_START_INDEX.store(0, Ordering::SeqCst);
         SOLUTIONS_COUNT.store(0, Ordering::SeqCst);
         TOTAL_COMBINATIONS.store(total_combinations, Ordering::SeqCst);
         *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
@@ -222,6 +224,7 @@ pub fn clear_recovery_session(session_id: &str) -> Result<bool, String> {
     }
     CANCEL_FLAG.store(true, Ordering::SeqCst);
     SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
+    SESSION_START_INDEX.store(0, Ordering::SeqCst);
     *active = None;
     drop(active);
     clear_session_secrets();
@@ -241,8 +244,10 @@ pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatus
             .map(|t| t.elapsed().as_secs_f64())
             .unwrap_or(0.0);
 
+        let start_idx = SESSION_START_INDEX.load(Ordering::Relaxed);
+        let processed_since_start = current_idx.saturating_sub(start_idx);
         let speed = if elapsed > 0.1 {
-            current_idx as f64 / elapsed
+            processed_since_start as f64 / elapsed
         } else {
             0.0
         };
@@ -349,6 +354,7 @@ pub fn run_dual_word_session_worker(
             PAUSE_FLAG.store(false, Ordering::SeqCst);
             CANCEL_FLAG.store(false, Ordering::SeqCst);
             CURRENT_INDEX.store(start_from_index, Ordering::SeqCst);
+            SESSION_START_INDEX.store(start_from_index, Ordering::SeqCst);
             TOTAL_COMBINATIONS.store(effective_total_combinations, Ordering::SeqCst);
             *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
         }
@@ -542,6 +548,7 @@ mod tests {
         // Test Cancel
         let cancel_res = request_cancel_session(&res.session_id).unwrap();
         assert!(cancel_res);
+        let _ = clear_recovery_session(&res.session_id);
     }
 
     #[test]

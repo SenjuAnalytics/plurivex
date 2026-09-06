@@ -155,6 +155,37 @@ pub fn bitcoin_credentials_from_private_key(
     Ok((btc_native_segwit, btc_legacy, btc_wif))
 }
 
+/// Derive BIP-49 Nested SegWit (P2WPKH-in-P2SH) address: "3..."
+pub fn bitcoin_p2sh_segwit_address_from_private_key(
+    privkey_bytes: &[u8; 32],
+) -> Result<String, String> {
+    let signing_key = SigningKey::from_bytes(privkey_bytes.into())
+        .map_err(|e| format!("Failed to parse private key: {}", e))?;
+    let verifying_key = signing_key.verifying_key();
+    let compressed_pubkey = verifying_key.to_encoded_point(true);
+    let pubkey_bytes = compressed_pubkey.as_bytes();
+
+    let sha256_hash = Sha256::digest(pubkey_bytes);
+    let hash160 = Ripemd160::digest(sha256_hash);
+
+    // Redeem script for P2WPKH: 0x00 0x14 <20-byte-hash160>
+    let mut redeem_script = [0u8; 22];
+    redeem_script[0] = 0x00; // OP_0
+    redeem_script[1] = 0x14; // Push 20 bytes
+    redeem_script[2..22].copy_from_slice(&hash160);
+
+    let script_sha = Sha256::digest(&redeem_script);
+    let script_hash160 = Ripemd160::digest(script_sha);
+
+    // P2SH Base58Check (version byte 0x05 for Bitcoin Mainnet "3...")
+    let mut p2sh_payload = Vec::with_capacity(25);
+    p2sh_payload.push(0x05);
+    p2sh_payload.extend_from_slice(&script_hash160);
+    let chk = Sha256::digest(Sha256::digest(&p2sh_payload));
+    p2sh_payload.extend_from_slice(&chk[0..4]);
+    Ok(bs58::encode(&p2sh_payload).into_string())
+}
+
 /// Native multi-chain derivation supporting seed phrase, EVM hex key, and Solana Base58 key
 pub fn derive_dual_credentials_native(
     secret: &str,
@@ -331,15 +362,16 @@ pub fn derive_solana_address_only_native(
     Ok(Some(bs58::encode(verifying_key.as_bytes()).into_string()))
 }
 
-/// Derive ONLY Bitcoin public addresses (Native SegWit BIP-84 & Legacy BIP-44) directly from mnemonic
+/// Derive ONLY Bitcoin public addresses (Native SegWit BIP-84, Nested SegWit BIP-49, & Legacy BIP-44) directly from mnemonic
 pub fn derive_bitcoin_addresses_only_native(
     mnemonic_phrase: &str,
-) -> Result<(Option<String>, Option<String>), String> {
+) -> Result<(Option<String>, Option<String>, Option<String>), String> {
     let t = mnemonic_phrase.trim();
     let mnemonic = Mnemonic::parse_normalized(t)
         .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
     let seed_bytes = Zeroizing::new(mnemonic.to_seed(""));
 
+    // 1. Native SegWit (BIP-84) "bc1q..."
     let btc_address = match "m/84'/0'/0'/0/0".parse::<DerivationPath>() {
         Ok(p) => match XPrv::derive_from_path(&*seed_bytes, &p) {
             Ok(x) => {
@@ -355,6 +387,20 @@ pub fn derive_bitcoin_addresses_only_native(
         Err(_) => None,
     };
 
+    // 2. Nested SegWit P2SH (BIP-49) "3..."
+    let btc_p2sh_address = match "m/49'/0'/0'/0/0".parse::<DerivationPath>() {
+        Ok(p) => match XPrv::derive_from_path(&*seed_bytes, &p) {
+            Ok(x) => {
+                let pk: Zeroizing<[u8; 32]> =
+                    Zeroizing::new(x.private_key().to_bytes().into());
+                bitcoin_p2sh_segwit_address_from_private_key(&pk).ok()
+            }
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    // 3. Legacy (BIP-44) "1..."
     let btc_legacy_address = match "m/44'/0'/0'/0/0".parse::<DerivationPath>() {
         Ok(p) => match XPrv::derive_from_path(&*seed_bytes, &p) {
             Ok(x) => {
@@ -370,7 +416,7 @@ pub fn derive_bitcoin_addresses_only_native(
         Err(_) => None,
     };
 
-    Ok((btc_address, btc_legacy_address))
+    Ok((btc_address, btc_p2sh_address, btc_legacy_address))
 }
 
 /// Zero-RAM-leakage: Derive only public addresses without ever creating private key strings in memory.

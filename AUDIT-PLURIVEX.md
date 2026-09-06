@@ -790,7 +790,7 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 3. **⚡ K5 — Derivasi Selektif Tunggal per-Chain pada Target Matcher**
    - Mengklasifikasikan format target address (`0x...` untuk EVM, `bc1`/`1`/`3` untuk BTC, Base58 untuk Solana) sebelum komputasi.
    - Menambahkan fungsi derivasi tunggal: `derive_evm_address_only_native`, `derive_solana_address_only_native`, dan `derive_bitcoin_addresses_only_native`.
-   - Mengeliminasi 75% beban komputasi kurva eliptis per kandidat kata (mewujudkan percepatan 4x–8x yang sesungguhnya tanpa alokasi private key di heap).
+   - Mengeliminasi 75% beban komputasi kurva eliptis per kandidat kata (menghasilkan percepatan wall-clock nyata 2x–3x; hashing PBKDF2 2048 ronde tetap dihitung per kandidat) tanpa alokasi private key di heap.
 
 4. **🔒 K4 & R2 — Content Security Policy Kedap & Penghapusan Google Fonts**
    - Menghapus `https:` dan `asset:` dari `img-src` produksi untuk menutup celah eksfiltrasi data via CSS/HTML.
@@ -802,6 +802,18 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
    - **Z4**: Membungkus buffer rahasia perantara (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`, serta `decoded` & `raw32` pada cabang `sol_pk`) di `derivation.rs` dengan tipe RAII `zeroize::Zeroizing`. Menjamin auto-wipe pada seluruh jalur keluar fungsi termasuk early error return (`?`).
    - **Z5**: `start_in_memory_session` memanggil `clear_session_secrets()` di awal sebelum inisialisasi sesi baru.
    - **Dokumentasi**: Menyelaraskan klaim zeroize di `README.md` menjadi *"Volatile Memory Zeroization (`zeroize` Crate)"*.
+
+6. **🔒 L1 — Zero-Disk & Volatile RAM Wipe saat Vault Dikunci**
+   - Saat pengguna mengunci vault (`useAuthVault.ts: lock()`), frontend memanggil `invoke('clear_recovery_session', { sessionId: '' })`.
+   - Menjamin bahwa jika pengguna meninggalkan workstation atau mengunci vault di tengah atau setelah recovery session, seluruh sisa rahasia di RAM (`ACTIVE_SESSION_ID`, `ACTIVE_RAW_PHRASE`, `CACHED_TARGET_MATCH`, `CACHED_SOLUTIONS`) langsung di-zeroize seketika.
+
+7. **📈 N1 — Metrik Kecepatan & Estimasi ETA Mulus saat Resume Sesi**
+   - Menambahkan pelacak `SESSION_START_INDEX` yang diinisialisasi ulang ke `start_from_index` setiap kali worker di-resume.
+   - Perhitungan kecepatan (CPS) dan sisa waktu (ETA) kini dihitung berbasis iterasi yang diproses sejak worker aktif (`(current - start) / elapsed`), mengeliminasi spike CPS artifisial dan fluktuasi ETA di frontend.
+
+8. **🪙 N2 & Test Teardown — Dukungan Bitcoin BIP-49 (P2SH-P2WPKH) & Test Isolation**
+   - Menambahkan implementasi derivasi alamat Bitcoin BIP-49 (`3...`) pada `derivation.rs` dan matcher `target_match.rs`, melengkapi dukungan ketiga format standar Bitcoin (Native SegWit `bc1q`, Nested SegWit `3`, dan Legacy `1`).
+   - `test_in_memory_recovery_session_lifecycle` kini secara eksplisit memanggil `clear_recovery_session` di akhir eksekusi untuk menjamin kebersihan memori global backend antar-test.
 
 
 

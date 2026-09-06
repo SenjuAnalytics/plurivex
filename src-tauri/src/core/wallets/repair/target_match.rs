@@ -26,11 +26,22 @@ pub fn check_target_match(
             }
         }
     } else if is_btc {
-        if let Ok((segwit, legacy)) =
+        if let Ok((segwit, p2sh, legacy)) =
             crate::core::wallets::derivation::derive_bitcoin_addresses_only_native(test_phrase)
         {
             if let Some(ref addr) = segwit {
                 if addr.eq_ignore_ascii_case(t) {
+                    return Some(TargetAddressMatch {
+                        position_index,
+                        word: word.to_string(),
+                        phrase: test_phrase.to_string(),
+                        matched_address: addr.clone(),
+                        chain_family: "bitcoin".to_string(),
+                    });
+                }
+            }
+            if let Some(ref addr) = p2sh {
+                if addr == t {
                     return Some(TargetAddressMatch {
                         position_index,
                         word: word.to_string(),
