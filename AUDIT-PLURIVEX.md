@@ -873,6 +873,11 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Plaintext private key **0% terpapar di heap runtime JavaScript** selama seluruh siklus hidup sweep.
     - **Total Pengujian**: **52 unit test** (51 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
+17. **⚡ Resolusi Review F11 & Determinisme Penuh Raw Transaction**
+    - **F11 (Eliminasi Race Condition Worker Inisialisasi State)**: Memindahkan blok inisialisasi state sesi (`ACTIVE_SESSION_ID`, `CANCEL_FLAG`, `CURRENT_INDEX`, dll.) keluar dari closure thread spawn ke thread pemanggil (`run_dual_word_session_worker`) sebelum `std::thread::spawn` dieksekusi. Menambahkan guard abort cepat jika thread telah dibatalkan/superseded (`SESSION_GENERATION != generation || CANCEL_FLAG`). Menghapus delay artifisial `std::thread::sleep(50ms)` dari unit test.
+    - **Verifikasi Deterministik Raw Tx Sealed vs Direct**: Memperbarui unit test `test_sealed_evm_and_solana_signing_roundtrip` dengan `assert_eq!` eksplisit antara `raw_tx` command sealed dan `sign_evm_transfer_with_secret` langsung, serta `raw_tx_base64` sealed Solana dan `sign_solana_transfer_with_secret` langsung. Membuktikan secara matematis tidak ada mutasi apa pun pada payload transaksi antara dekripsi vault dan signing.
+
+
 
 
 

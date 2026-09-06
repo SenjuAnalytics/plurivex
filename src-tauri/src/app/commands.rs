@@ -675,10 +675,26 @@ mod tests {
             encrypted.clone(),
             password.to_string(),
             "seed".to_string(),
-            evm_tx,
+            evm_tx.clone(),
         ).unwrap();
         assert_eq!(evm_result.from_address.to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
         assert!(evm_result.raw_tx.starts_with("0x"));
+
+        // Direct unencrypted EVM signing verification (assert exact bit-for-bit equality)
+        let evm_params = crate::core::wallets::signing::EvmTransferParams {
+            chain_id: evm_tx.chain_id,
+            to_address: &evm_tx.to_address,
+            value_wei_hex: &evm_tx.value_wei_hex,
+            gas_price_wei_hex: &evm_tx.gas_price_wei_hex,
+            gas_limit: evm_tx.gas_limit,
+            nonce: evm_tx.nonce,
+        };
+        let expected_raw_tx = crate::core::wallets::signing::sign_evm_transfer_with_secret(
+            mnemonic,
+            "seed",
+            &evm_params,
+        ).unwrap();
+        assert_eq!(evm_result.raw_tx, expected_raw_tx);
 
         // Test EVM address derivation sealed
         let derived_evm_addr = get_evm_address_sealed(encrypted.clone(), password.to_string(), "seed".to_string()).unwrap();
@@ -695,10 +711,25 @@ mod tests {
             encrypted.clone(),
             password.to_string(),
             "seed".to_string(),
-            sol_tx,
+            sol_tx.clone(),
         ).unwrap();
         assert_eq!(sol_result.from_address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
         assert!(!sol_result.raw_tx_base64.is_empty());
+
+        // Direct unencrypted Solana signing verification (assert exact bit-for-bit equality)
+        let sol_params = crate::core::wallets::solana_signing::SolanaTransferParams {
+            recipient: &sol_tx.recipient,
+            lamports: sol_tx.lamports,
+            recent_blockhash: &sol_tx.recent_blockhash,
+            is_nonce_account: sol_tx.is_nonce_account,
+        };
+        let expected_sol_result = crate::core::wallets::solana_signing::sign_solana_transfer_with_secret(
+            mnemonic,
+            "seed",
+            &sol_params,
+        ).unwrap();
+        assert_eq!(sol_result.raw_tx_base64, expected_sol_result.raw_tx_base64);
+        assert_eq!(sol_result.from_address, expected_sol_result.from_address);
 
         // Test Solana address derivation sealed
         let derived_sol_addr = get_solana_address_sealed(encrypted, password.to_string(), "seed".to_string()).unwrap();

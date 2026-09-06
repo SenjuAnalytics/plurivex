@@ -302,10 +302,26 @@ pub fn run_dual_word_session_worker(
     raw_phrase: String,
     target_address: Option<String>,
     start_from_index: usize,
-    _total_combinations: usize,
+    total_combinations: usize,
     generation: usize,
 ) {
+    // Synchronously initialize/bind active session tracker in calling thread BEFORE spawning worker thread (F11)
+    {
+        *safe_lock(&ACTIVE_SESSION_ID) = Some(session_id.clone());
+        PAUSE_FLAG.store(false, Ordering::SeqCst);
+        CANCEL_FLAG.store(false, Ordering::SeqCst);
+        CURRENT_INDEX.store(start_from_index, Ordering::SeqCst);
+        SESSION_START_INDEX.store(start_from_index, Ordering::SeqCst);
+        TOTAL_COMBINATIONS.store(total_combinations, Ordering::SeqCst);
+        *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
+    }
+
     std::thread::spawn(move || {
+        // Fast abort if this worker thread was cancelled or superseded before starting
+        if SESSION_GENERATION.load(Ordering::SeqCst) != generation || CANCEL_FLAG.load(Ordering::SeqCst) {
+            return;
+        }
+
         // Parse words & identify missing slot positions
         let tokens: Vec<&str> = raw_phrase.split_whitespace().collect();
         let (lang, _) = detect_mnemonic_language(&tokens);
@@ -339,25 +355,6 @@ pub fn run_dual_word_session_worker(
         } else {
             vec![(10, 11)]
         };
-
-        let effective_total_combinations = if missing_word_indices.len() == 1 {
-            2048
-        } else if is_all_66_pairs {
-            66 * 4_194_304
-        } else {
-            4_194_304
-        };
-
-        // Initialize active session tracker in RAM
-        {
-            *safe_lock(&ACTIVE_SESSION_ID) = Some(session_id.clone());
-            PAUSE_FLAG.store(false, Ordering::SeqCst);
-            CANCEL_FLAG.store(false, Ordering::SeqCst);
-            CURRENT_INDEX.store(start_from_index, Ordering::SeqCst);
-            SESSION_START_INDEX.store(start_from_index, Ordering::SeqCst);
-            TOTAL_COMBINATIONS.store(effective_total_combinations, Ordering::SeqCst);
-            *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
-        }
 
         let clean_target = target_address.as_ref().map(|s| s.trim().to_string());
         let mut found_target_match: Option<TargetAddressMatch> =
@@ -552,7 +549,6 @@ mod tests {
         let cancel_res = request_cancel_session(&res.session_id).unwrap();
         assert!(cancel_res);
         let _ = clear_recovery_session(&res.session_id);
-        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     #[test]
