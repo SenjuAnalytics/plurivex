@@ -202,6 +202,34 @@ export async function deriveDualCredentialsBatchNative(
   });
 }
 
+export interface PublicAddressesOnly {
+  evmAddress: string | null;
+  solAddress: string | null;
+  btcAddress?: string | null;
+  btcLegacyAddress?: string | null;
+}
+
+export async function derivePublicAddressesNative(
+  secret: string,
+  type: WalletType
+): Promise<PublicAddressesOnly> {
+  return await invoke<PublicAddressesOnly>("vault_derive_public_only", {
+    secret,
+    walletType: type,
+  });
+}
+
+export async function derivePublicAddressesBatchNative(
+  secrets: string[],
+  type: WalletType
+): Promise<(PublicAddressesOnly | null)[]> {
+  return await invoke<(PublicAddressesOnly | null)[]>("vault_derive_public_only_batch", {
+    secrets,
+    walletType: type,
+  });
+}
+
+
 
 
 export function shortAddr(a: string) {

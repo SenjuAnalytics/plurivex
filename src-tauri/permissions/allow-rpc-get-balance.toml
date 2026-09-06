@@ -65,8 +65,11 @@ description = "Allow native dual-chain key derivation and mnemonic validation"
 commands.allow = [
   "vault_derive_credentials",
   "vault_derive_credentials_batch",
+  "vault_derive_public_only",
+  "vault_derive_public_only_batch",
   "vault_validate_mnemonic",
-  "vault_repair_mnemonic"
+  "vault_repair_mnemonic",
+  "vault_extract_credentials"
 ]
 
 [[permission]]

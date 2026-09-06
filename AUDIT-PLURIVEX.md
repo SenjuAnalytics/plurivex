@@ -894,6 +894,25 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Di `SessionTrackerCard.tsx` & `RepairWorkspace.tsx`: Menyembunyikan tombol *"Mulai Sesi Baru"* jika `isSingleWordMissing` bernilai true, menggantikannya dengan badge informatif bahwa 2.048 kombinasi telah dianalisis instan secara live di memori.
       - Di `commands.rs` & `recovery_session.rs`: Menghapus parameter `search_type` yang usang/tidak digunakan dari signature `start_recovery_session` dan `start_in_memory_session`.
 
+20. **🛡️ Whitelist ACL Native Extractor, Derivasi Public-Only pada Import, & Pembersihan Ghost Dependencies**
+    - **Whitelist ACL `vault_extract_credentials` (`allow-rpc-get-balance.toml`)**:
+      - Menambahkan permission `vault_extract_credentials` ke set `allow-vault-derivation` pada Tauri v2 ACL.
+      - Menghilangkan kegagalan silent permission Tauri saat eksekusi `smartNormalizeInputNative`, memastikan deteksi regex berkecepatan tinggi di native Rust dieksekusi 100% tanpa jatuh ke fallback JS.
+    - **P0 Public-Only Address Derivation (`derivation.rs`, `commands.rs`, `lib.rs`, `wallet.ts`)**:
+      - Menambahkan fungsi Rust `derive_public_addresses_native` dan `derive_public_addresses_batch_native` yang mengembalikan struct `PublicAddressesOnly` (hanya `evm_address`, `sol_address`, `btc_address`, `btc_legacy_address`).
+      - Untuk wallet tipe seed phrase, fungsi ini secara matematis memotong pembuatan string private key di heap RAM dan murni menghasilkan public address saja.
+      - Mendaftarkan command Tauri `vault_derive_public_only` dan `vault_derive_public_only_batch` serta memasukkannya ke whitelist ACL `allow-rpc-get-balance.toml`.
+    - **Frontend Mass Import & Address Backfill Hardening (`useWalletOperations.ts`, `AppContext.tsx`)**:
+      - Pada alur mass import (`importWallets`), mengganti pemanggilan derivasi kredensial privat ganda dengan `derivePublicAddressesBatchNative` dan `derivePublicAddressesNative`.
+      - Pada alur sinkronisasi address background di `AppContext.tsx`, mengganti derivasi dual credentials dengan `derivePublicAddressesNative`.
+      - Menjamin **0 private key pernah dikembalikan via IPC atau diinstansiasi di memori JavaScript/V8** selama proses import massal dan backfill alamat.
+    - **Pembersihan Ghost Dependencies (`package.json`)**:
+      - Menghapus `@noble/ed25519` dan `ed25519-hd-key` dari dependensi produksi `package.json`, memastikan bundle dependency bersih dari pustaka kripto usang yang telah dimigrasikan ke Rust backend.
+    - **Guardrail Transparansi DEX Simulator (`DexBatchTrader.tsx`)**:
+      - Menambahkan badge visual `SIMULATOR PREVIEW` pada header UI dan memperbarui pesan notifikasi order untuk menegaskan bahwa DEX batch swap saat ini berjalan dalam mode simulasi / dry-run preview (mesin on-chain routing dijadwalkan pada Fase 4).
+    - **Total Pengujian**: **54 unit test** (53 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
+
+
 
 
 

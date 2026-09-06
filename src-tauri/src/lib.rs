@@ -35,6 +35,8 @@ pub fn run() {
             app::commands::vault_verify_token,
             app::commands::vault_derive_credentials,
             app::commands::vault_derive_credentials_batch,
+            app::commands::vault_derive_public_only,
+            app::commands::vault_derive_public_only_batch,
             app::commands::vault_validate_mnemonic,
             app::commands::vault_repair_mnemonic,
             app::commands::set_air_gapped_mode,

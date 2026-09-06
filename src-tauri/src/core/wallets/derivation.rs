@@ -522,6 +522,37 @@ pub fn derive_dual_credentials_batch_native(
         .collect()
 }
 
+/// Universal public-only address derivation supporting seed phrase, EVM hex key, and Solana Base58 key.
+/// Zero-RAM-leakage: Private keys are never returned across IPC.
+pub fn derive_public_addresses_native(
+    secret: &str,
+    wallet_type: &str,
+) -> Result<PublicAddressesOnly, String> {
+    if wallet_type == "seed" {
+        derive_public_addresses_only_native(secret)
+    } else {
+        let creds = derive_dual_credentials_native(secret, wallet_type)?;
+        Ok(PublicAddressesOnly {
+            evm_address: creds.evm_address,
+            sol_address: creds.sol_address,
+            btc_address: creds.btc_address,
+            btc_legacy_address: creds.btc_legacy_address,
+        })
+    }
+}
+
+/// Batch public-only address derivation for mass imports with zero private key exposure
+pub fn derive_public_addresses_batch_native(
+    secrets: &[String],
+    wallet_type: &str,
+) -> Vec<Option<PublicAddressesOnly>> {
+    secrets
+        .iter()
+        .map(|s| derive_public_addresses_native(s, wallet_type).ok())
+        .collect()
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +621,17 @@ mod tests {
             legacy.as_deref(),
             Some("1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA")
         );
+    }
+
+    #[test]
+    fn test_public_addresses_only_derivation_seed_and_batch() {
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let pub_only = derive_public_addresses_native(mnemonic, "seed").expect("Public derivation failed");
+        assert_eq!(pub_only.evm_address.unwrap().to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
+        assert_eq!(pub_only.sol_address.unwrap(), "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+
+        let batch = derive_public_addresses_batch_native(&[mnemonic.to_string()], "seed");
+        assert_eq!(batch.len(), 1);
+        assert!(batch[0].is_some());
     }
 }

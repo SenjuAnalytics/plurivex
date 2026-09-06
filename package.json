@@ -10,7 +10,6 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@noble/ed25519": "^3.1.0",
     "@solana/web3.js": "^1.98.4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
@@ -18,7 +17,6 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-sql": "^2.4.0",
     "bs58": "^6.0.0",
-    "ed25519-hd-key": "^2.0.0",
     "ethers": "^5.7.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

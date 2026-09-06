@@ -7,7 +7,7 @@ import { useWalletScanner } from "./hooks/useWalletScanner";
 import { useAuthVault, type Screen } from "./hooks/useAuthVault";
 import { useTokenPrices } from "./hooks/useTokenPrices";
 import { decrypt } from "../lib/crypto";
-import { deriveDualCredentialsNative } from "../lib/wallet";
+import { derivePublicAddressesNative } from "../lib/wallet";
 import { updateWalletAddresses } from "../lib/db";
 
 export type { ExportOptions };
@@ -141,7 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const sec = await decrypt(w.encryptedSecret, auth.masterPw);
           if (!sec) continue;
-          const creds = await deriveDualCredentialsNative(sec, w.type);
+          const creds = await derivePublicAddressesNative(sec, w.type);
           const newEvm = creds.evmAddress ?? w.address;
           const newSol = creds.solAddress ?? w.solAddress;
           const newBtc = creds.btcAddress ?? w.btcAddress;

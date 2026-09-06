@@ -23,7 +23,8 @@ import { smartNormalizeInputNative } from "../../lib/extract";
 import {
   classify,
   deriveDualCredentialsNative,
-  deriveDualCredentialsBatchNative,
+  derivePublicAddressesNative,
+  derivePublicAddressesBatchNative,
   walletHasScanTarget,
   type DualCredentials,
 } from "../../lib/wallet";
@@ -117,7 +118,7 @@ export function useWalletOperations({
     let added = 0;
     let skipped = 0;
 
-    const derivedList = await deriveDualCredentialsBatchNative(lines, "seed");
+    const derivedList = await derivePublicAddressesBatchNative(lines, "seed");
 
     const itemsToProcess: {
       line: string;
@@ -148,7 +149,7 @@ export function useWalletOperations({
         continue;
       }
 
-      const derived = derivedList[i] || (await deriveDualCredentialsNative(line, walletType));
+      const derived = derivedList[i] || (await derivePublicAddressesNative(line, walletType));
       const address = derived.evmAddress ?? null;
       const solAddress = derived.solAddress ?? null;
       const btcAddress = derived.btcAddress ?? null;

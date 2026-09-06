@@ -262,6 +262,28 @@ pub async fn vault_derive_credentials_batch(
 }
 
 #[tauri::command]
+pub async fn vault_derive_public_only(
+    secret: String,
+    wallet_type: String,
+) -> Result<crate::core::wallets::derivation::PublicAddressesOnly, String> {
+    crate::core::wallets::derivation::derive_public_addresses_native(&secret, &wallet_type)
+}
+
+#[tauri::command]
+pub async fn vault_derive_public_only_batch(
+    secrets: Vec<String>,
+    wallet_type: String,
+) -> Result<Vec<Option<crate::core::wallets::derivation::PublicAddressesOnly>>, String> {
+    Ok(
+        crate::core::wallets::derivation::derive_public_addresses_batch_native(
+            &secrets,
+            &wallet_type,
+        ),
+    )
+}
+
+
+#[tauri::command]
 pub async fn vault_validate_mnemonic(phrase: String) -> Result<bool, String> {
     Ok(crate::core::wallets::derivation::is_valid_mnemonic_phrase(
         &phrase,

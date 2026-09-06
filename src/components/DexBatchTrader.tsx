@@ -23,7 +23,10 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
     setIsExecuting(true);
     setTimeout(() => {
       setIsExecuting(false);
-      toast(`Batch ${tradeAction.toUpperCase()} order prepared for ${activeWalletsCount} wallets`, "success");
+      toast(
+        `Simulation: Batch ${tradeAction.toUpperCase()} order simulated for ${activeWalletsCount} wallets (on-chain DEX engine in Phase 4 development)`,
+        "info"
+      );
     }, 1200);
   };
 
@@ -32,9 +35,12 @@ export function DexBatchTrader({ wallet: _wallet }: { wallet?: WalletView }) {
       {/* 1. Header Banner */}
       <div className="dex-header">
         <div className="dex-title-box">
-          <div className="dex-badge">MULTI-WALLET SWAP ENGINE</div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="dex-badge">MULTI-WALLET SWAP ENGINE</span>
+            <span className="badge badge-warning">SIMULATOR PREVIEW</span>
+          </div>
           <h3>DEX Batch Trader</h3>
-          <p>Execute parallel buys and sells across Uniswap, PancakeSwap, & Raydium from multiple wallets simultaneously.</p>
+          <p>Simulation Preview: Execute parallel buys and sells across Uniswap, PancakeSwap, & Raydium (on-chain DEX routing engine in development).</p>
         </div>
         <div className="dex-mode-pills">
           <button
