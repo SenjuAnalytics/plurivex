@@ -186,8 +186,8 @@ activeClipboardTimer = setTimeout(async () => {
 > Yang tersisa cuma rekomendasi kecil (label `TODO:`) — bukan bug.
 
 ```rust
-// src-tauri/src/core/archive/plurix.rs (2 baris)
-pub struct PlurixArchive;
+// src-tauri/src/core/archive/plurivex.rs (2 baris)
+pub struct PlurivexArchive;
 ```
 Verifikasi call-graph tetap menunjukkan semua di-referensi 0 kali — **tapi sekarang gue baca itu sebagai "belum dikerjakan", bukan "salah nulis".**
 
@@ -336,7 +336,7 @@ Header-nya eksplisit: `secret_key_or_mnemonic,btc_wif,evm_pk,sol_pk`
 
 Kontradiksi langsung dengan klaim README **"Zero-Disk Forensics"** dan **"tidak ada satu byte pun data seed phrase mentah yang ditulis ke harddisk"**.
 
-Nggak ada konfirmasi kedua, nggak ada warning, nggak ada auto-wipe, nggak ada opsi encrypted export (padahal `PlurixArchive` stub-nya ada).
+Nggak ada konfirmasi kedua, nggak ada warning, nggak ada auto-wipe, nggak ada opsi encrypted export (padahal `PlurivexArchive` stub-nya ada).
 
 ---
 
@@ -496,7 +496,7 @@ await database.execute("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;")
 ### 🔥 P0 — Berhenti semua, kerjakan sekarang (bisa bikin user kehilangan dana/privasi)
 1. **Bug #2 — sambungkan `set_air_gapped_mode`.** ~15 menit. Fitur keamanan utama lu sekarang nol fungsinya.
 2. **Bug #1 — `recentBlockhash`** → bungkus `{ blockhash }`. ~5 menit. Batch Sweeper SOL mati total tanpa ini.
-3. **Bug #3 — plain-text CSV export.** Minimal: modal konfirmasi + peringatan "file ini berisi private key", opsi auto-wipe, idealnya pakai `PlurixArchive` (yang belum diimplementasi).
+3. **Bug #3 — plain-text CSV export.** Minimal: modal konfirmasi + peringatan "file ini berisi private key", opsi auto-wipe, idealnya pakai `PlurivexArchive` (yang belum diimplementasi).
 4. **Bug #7 — deklarasikan `@ethersproject/wordlists`** di `package.json`. ~1 menit.
 
 ### 🟠 P1 — Perbaiki minggu ini
@@ -510,7 +510,7 @@ await database.execute("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;")
 ### 🟡 P2 — Kerjakan sebelum rilis
 11. **`continue 'outer_all_pairs`** buat skip pair selesai (Bug #6).
 12. **`HashMap<SessionId, _>`** buat isolasi sesi + tolak resume ganda (Bug #5).
-13. ~~Hapus 9 stub kosong~~ → **DICABUT (v2).** Stub dibiarkan, tapi **tag `TODO(plurix):`** di tiap stub + **1 baris legenda** di README. (BAGIAN 6.4)
+13. ~~Hapus 9 stub kosong~~ → **DICABUT (v2).** Stub dibiarkan, tapi **tag `TODO(plurivex):`** di tiap stub + **1 baris legenda** di README. (BAGIAN 6.4)
 13b. **Kerjakan `core/execution/sweeper.rs` BARENG P1.5**, jangan nanti — satu-satunya stub yang punya deadline diam-diam. (BAGIAN 6.2)
 14. **Ganti `fingerprint.rs` sekarang** (SHA-256, bukan `data.len()`) — 2 menit, dan lebih murah hari ini daripada setelah ada yang manggil. (BAGIAN 6.3③)
 14b. **`PRAGMA busy_timeout = 5000`** di `scanner/mod.rs` + `db.ts` → tutup Bug #11. (~5 menit)
@@ -531,7 +531,7 @@ Gue cek ulang isi 9 stub itu. Ternyata bukan kode buangan:
 ```rust
 // core/execution/simulator.rs   →  // Zero-loss transaction dry-run simulator
 // core/network/hedging.rs       →  // Multi-endpoint RPC hedging race engine
-// core/archive/plurix.rs        →  // Encrypted portable .plurix archive vault
+// core/archive/plurivex.rs       →  // Encrypted portable .plurivex archive vault
 // core/notifications/webhook.rs →  // Multi-channel webhook notifier (Discord/Slack/Telegram)
 ```
 
@@ -543,7 +543,7 @@ Gue klasifikasi ulang semua stub dengan pertanyaan: **apakah logikanya sekarang 
 
 | Stub Rust | LOC | Padanan di JS? | Klasifikasi |
 |---|---|---|---|
-| `core/archive/plurix.rs` | 2 | ❌ TIDAK ADA | 🟢 **Murni scaffold** — 100% konsisten dg strategimu |
+| `core/archive/plurivex.rs` | 2 | ❌ TIDAK ADA | 🟢 **Murni scaffold** — 100% konsisten dg strategimu |
 | `core/execution/trader.rs` | 2 | ❌ TIDAK ADA (DexBatchTrader.tsx = **0 baris logika**, UI doang) | 🟢 **Murni scaffold** — malah teladan yang benar |
 | `core/execution/simulator.rs` | 2 | ❌ TIDAK ADA | 🟢 Murni scaffold |
 | `core/execution/queue.rs` | 2 | ❌ TIDAK ADA | 🟢 Murni scaffold |
@@ -609,26 +609,26 @@ dan samakan kanonikasinya dengan `src/lib/wallet.ts::canonicalKey` — kalau bed
 
 Nggak perlu ubah struktur. Cukup bikin pohon **bisa diaudit mesin**:
 
-**① Tambah `TODO(plurix):` di tiap stub kosong.**
-Kenapa penting: `pub struct SweeperService;` **nggak bisa dicari**, tapi `TODO(plurix):` bisa.
+**① Tambah `TODO(plurivex):` di tiap stub kosong.**
+Kenapa penting: `pub struct SweeperService;` **nggak bisa dicari**, tapi `TODO(plurivex):` bisa.
 ```rust
 // core/execution/sweeper.rs
 // Sweeper execution core service
-// TODO(plurix): pindahkan dari src/lib/sweeper.ts (467b) — JANGAN tulis ulang, MIGRASI.
+// TODO(plurivex): pindahkan dari src/lib/sweeper.ts (467b) — JANGAN tulis ulang, MIGRASI.
 pub struct SweeperService;
 ```
-Sekali `grep -rn "TODO(plurix)" src-tauri/src` = backlog lu lengkap & selalu akurat. Stub yang nggak ke-tag = bakal kelupaan, itu satu-satunya kegagalan nyata dari model "tulis kode kalau udah ada file"-nya lu.
+Sekali `grep -rn "TODO(plurivex)" src-tauri/src` = backlog lu lengkap & selalu akurat. Stub yang nggak ke-tag = bakal kelupaan, itu satu-satunya kegagalan nyata dari model "tulis kode kalau udah ada file"-nya lu.
 
 **② Legenda 1 baris di README.**
 Ini bukan soal "misleading" — karena lu bilang sengaja, gue nggak nuduh ngarang. Tapi buat contributor/reviewer eksternal, satu baris nutup 100% gap ekspektasi:
 ```markdown
-> **Status:** modul bertanda `TODO(plurix)` = struktur siap-isi (belum diimplementasi).
+> **Status:** modul bertanda `TODO(plurivex)` = struktur siap-isi (belum diimplementasi).
 ```
 
 **③ Satu guard kecil di CI buat ngejaga pohonnya tetap konsisten:**
 ```bash
-# gagalin kalau ada stub tanpa TODO(plurix) — pohon nggak boleh diam-diam basi
-grep -rLZ "TODO(plurix)" $(grep -rl "^pub struct [A-Z][A-Za-z]*;$" src-tauri/src) 2>/dev/null
+# gagalin kalau ada stub tanpa TODO(plurivex) — pohon nggak boleh diam-diam basi
+grep -rLZ "TODO(plurivex)" $(grep -rl "^pub struct [A-Z][A-Za-z]*;$" src-tauri/src) 2>/dev/null
 ```
 
 **④ Untuk yang 1 stub yang udah punya pemilik (sweeper):**
@@ -737,7 +737,7 @@ Tapi justru karena mereka rigorous, dua hal di atas (7.1 cakupan wordlists, 7.2/
 
 ## 🧾 RINGKASAN SATU PARAGRAF
 
-Plurivex itu **proyek menengah dengan ambisi arsitektur yang lebih besar dari ukurannya** — modular, teruji (30 test), dan detail kriptonya (bit-packing BIP-39, guard air-gap, deteksi akun SPL/nonce) sudah level produksi. Strategi *tree-first* lu menurut gue **tepat**: gue cek 9 stub, 8 di antaranya murni scaffold tanpa padanan JS — artinya pohon itu bekerja persis seperti yang lu maksud. **Yang bikin laporan ini tetap perlu dibaca cuma satu hal:** pohon lu benar, tapi ada **satu cabang yang penghuninya nyasar** — `core/execution/sweeper.rs` masih kosong sementara versi JS-nya sudah 467 baris dan sudah memegang private key di webview. Itu bukan soal estetika penempatan: itu beda dengan 8 stub lain, karena dia punya **deadline diam-diam** — makin lama dibiarkan, makin besar kemungkinan lu menulis ulang alih-alih memindahkan, dan duplikasinya jadi permanen. Di atas itu ada 3 bug nyata yang gue reproduksi (air-gap tak tersambung ke Rust, plaintext key di CSV export, seed tak ter-zeroize di RAM) — semuanya independen dari soal stub. *Catatan v3: "Solana blockhash crash" gue cabut — gue yang salah, reviewer benar.* Rekomendasi gue: **pertahankan tree-first-nya**, tambahkan `TODO(plurix):` supaya pohon bisa diaudit mesin, dan jadikan migrasi sweeper→Rust sebagai fitur besar berikutnya, karena itu sekaligus ngisi stub, nutup bug #1, dan ngejawab klaim "zero key exposure" di README.
+Plurivex itu **proyek menengah dengan ambisi arsitektur yang lebih besar dari ukurannya** — modular, teruji (30 test), dan detail kriptonya (bit-packing BIP-39, guard air-gap, deteksi akun SPL/nonce) sudah level produksi. Strategi *tree-first* lu menurut gue **tepat**: gue cek 9 stub, 8 di antaranya murni scaffold tanpa padanan JS — artinya pohon itu bekerja persis seperti yang lu maksud. **Yang bikin laporan ini tetap perlu dibaca cuma satu hal:** pohon lu benar, tapi ada **satu cabang yang penghuninya nyasar** — `core/execution/sweeper.rs` masih kosong sementara versi JS-nya sudah 467 baris dan sudah memegang private key di webview. Itu bukan soal estetika penempatan: itu beda dengan 8 stub lain, karena dia punya **deadline diam-diam** — makin lama dibiarkan, makin besar kemungkinan lu menulis ulang alih-alih memindahkan, dan duplikasinya jadi permanen. Di atas itu ada 3 bug nyata yang gue reproduksi (air-gap tak tersambung ke Rust, plaintext key di CSV export, seed tak ter-zeroize di RAM) — semuanya independen dari soal stub. *Catatan v3: "Solana blockhash crash" gue cabut — gue yang salah, reviewer benar.* Rekomendasi gue: **pertahankan tree-first-nya**, tambahkan `TODO(plurivex):` supaya pohon bisa diaudit mesin, dan jadikan migrasi sweeper→Rust sebagai fitur besar berikutnya, karena itu sekaligus ngisi stub, nutup bug #1, dan ngejawab klaim "zero key exposure" di README.
 
 ---
 
@@ -912,11 +912,11 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
       - Menambahkan badge visual `SIMULATOR PREVIEW` pada header UI dan memperbarui pesan notifikasi order untuk menegaskan bahwa DEX batch swap saat ini berjalan dalam mode simulasi / dry-run preview (mesin on-chain routing dijadwalkan pada Fase 4).
     - **Total Pengujian**: **54 unit test** (53 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
 
-21. **🏷️ Standarisasi Plurivex, Address-Only PK/Solana Derivation, & Penyempurnaan UX Simulasi DEX**
-    - **Standarisasi Menyeluruh Plurix ➔ Plurivex**:
-      - Memperbarui modul arsip: `src-tauri/src/core/archive/plurix.rs` ➔ `plurivex.rs`, `PlurixArchive` ➔ `PlurivexArchive`, dan `pub mod plurivex;`.
-      - Menyelaraskan seluruh penanda scaffold tree-first dari `TODO(plurix):` menjadi `TODO(plurivex):` di 10 modul domain Rust (`execution/queue.rs`, `simulator.rs`, `sweeper.rs`, `trader.rs`, `network/hedging.rs`, `proxy.rs`, `rpc_manager.rs`, `notifications/webhook.rs`, `vault/service.rs`, `archive/plurivex.rs`).
-      - Memperbarui format file arsip portabel dari `.plurix` ke `.plurivex` pada `README.md`, `PLURIVEX_MASTER_FEATURE_SPEC.md`, dan `PLURIVEX_IMPLEMENTATION_MATRIX.md`.
+21. **🏷️ Standarisasi Penamaan Plurivex, Address-Only PK/Solana Derivation, & Penyempurnaan UX Simulasi DEX**
+    - **Standarisasi Menyeluruh Identitas Plurivex**:
+      - Memperbarui modul arsip: `src-tauri/src/core/archive/plurivex.rs` (`PlurivexArchive`, dan `pub mod plurivex;`).
+      - Menyelaraskan seluruh penanda scaffold tree-first menjadi `TODO(plurivex):` di 10 modul domain Rust (`execution/queue.rs`, `simulator.rs`, `sweeper.rs`, `trader.rs`, `network/hedging.rs`, `proxy.rs`, `rpc_manager.rs`, `notifications/webhook.rs`, `vault/service.rs`, `archive/plurivex.rs`).
+      - Memperbarui format file arsip portabel ke `.plurivex` pada `README.md`, `PLURIVEX_MASTER_FEATURE_SPEC.md`, dan `PLURIVEX_IMPLEMENTATION_MATRIX.md`.
       - Memperbarui ID gradient pada `public/vite.svg` menjadi `plurivexP` dan `plurivexSlash`.
     - **Zero-Allocation Public-Only Derivation untuk `pk` & `sol_pk` (`derivation.rs`)**:
       - Cabang `pk` di `derive_public_addresses_native` kini langsung menggunakan `evm_address_only(&pk_arr)` dengan zeroized buffer tanpa membuat struct `DualCredentials` atau alokasi string hex private key di heap.
