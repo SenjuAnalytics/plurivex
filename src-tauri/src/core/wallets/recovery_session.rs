@@ -31,13 +31,20 @@ static CANCEL_FLAG: AtomicBool = AtomicBool::new(false);
 static CURRENT_INDEX: AtomicUsize = AtomicUsize::new(0);
 static SOLUTIONS_COUNT: AtomicUsize = AtomicUsize::new(0);
 static TOTAL_COMBINATIONS: AtomicUsize = AtomicUsize::new(0);
+static SESSION_GENERATION: AtomicUsize = AtomicUsize::new(0);
 static SESSION_START_TIME: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
 static CACHED_TARGET_MATCH: std::sync::Mutex<Option<TargetAddressMatch>> =
     std::sync::Mutex::new(None);
 static CACHED_SOLUTIONS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
+/// Resilient lock acquisition that recovers gracefully from poisoned mutexes
+#[inline]
+pub fn safe_lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub fn get_current_active_session_id() -> Option<String> {
-    ACTIVE_SESSION_ID.lock().unwrap().clone()
+    safe_lock(&ACTIVE_SESSION_ID).clone()
 }
 
 pub fn start_in_memory_session(
@@ -63,19 +70,21 @@ pub fn start_in_memory_session(
         4_194_304
     };
 
+    let generation = SESSION_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+
     // Store in-memory session parameters
     {
-        *ACTIVE_SESSION_ID.lock().unwrap() = Some(session_id.clone());
-        *ACTIVE_RAW_PHRASE.lock().unwrap() = Some(phrase.clone());
-        *ACTIVE_TARGET_ADDR.lock().unwrap() = target_address.clone();
+        *safe_lock(&ACTIVE_SESSION_ID) = Some(session_id.clone());
+        *safe_lock(&ACTIVE_RAW_PHRASE) = Some(phrase.clone());
+        *safe_lock(&ACTIVE_TARGET_ADDR) = target_address.clone();
         PAUSE_FLAG.store(false, Ordering::SeqCst);
         CANCEL_FLAG.store(false, Ordering::SeqCst);
         CURRENT_INDEX.store(0, Ordering::SeqCst);
         SOLUTIONS_COUNT.store(0, Ordering::SeqCst);
         TOTAL_COMBINATIONS.store(total_combinations, Ordering::SeqCst);
-        *SESSION_START_TIME.lock().unwrap() = Some(Instant::now());
-        *CACHED_TARGET_MATCH.lock().unwrap() = None;
-        CACHED_SOLUTIONS.lock().unwrap().clear();
+        *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
+        *safe_lock(&CACHED_TARGET_MATCH) = None;
+        safe_lock(&CACHED_SOLUTIONS).clear();
     }
 
     run_dual_word_session_worker(
@@ -84,6 +93,7 @@ pub fn start_in_memory_session(
         target_address,
         0,
         total_combinations,
+        generation,
     );
 
     Ok(RecoverySessionStatusResponse {
@@ -102,7 +112,7 @@ pub fn start_in_memory_session(
 }
 
 pub fn request_pause_session(session_id: &str) -> Result<bool, String> {
-    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    let active = safe_lock(&ACTIVE_SESSION_ID);
     if active.as_deref() == Some(session_id) {
         PAUSE_FLAG.store(true, Ordering::SeqCst);
         Ok(true)
@@ -115,38 +125,67 @@ pub fn request_pause_session(session_id: &str) -> Result<bool, String> {
 }
 
 pub fn request_resume_session(session_id: &str) -> Result<bool, String> {
-    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    let active = safe_lock(&ACTIVE_SESSION_ID);
     if active.as_deref() != Some(session_id) {
         return Err(format!("Session {} is not active in memory", session_id));
     }
     drop(active);
 
-    let phrase = ACTIVE_RAW_PHRASE
-        .lock()
-        .unwrap()
+    let phrase = safe_lock(&ACTIVE_RAW_PHRASE)
         .clone()
         .ok_or_else(|| "Session phrase expired from RAM".to_string())?;
-    let target = ACTIVE_TARGET_ADDR.lock().unwrap().clone();
+    let target = safe_lock(&ACTIVE_TARGET_ADDR).clone();
     let current_idx = CURRENT_INDEX.load(Ordering::SeqCst);
     let total = TOTAL_COMBINATIONS.load(Ordering::SeqCst);
 
+    // Invalidate previous thread by bumping generation counter
+    PAUSE_FLAG.store(true, Ordering::SeqCst);
+    let generation = SESSION_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     PAUSE_FLAG.store(false, Ordering::SeqCst);
     CANCEL_FLAG.store(false, Ordering::SeqCst);
 
-    run_dual_word_session_worker(session_id.to_string(), phrase, target, current_idx, total);
+    run_dual_word_session_worker(
+        session_id.to_string(),
+        phrase,
+        target,
+        current_idx,
+        total,
+        generation,
+    );
 
     Ok(true)
 }
 
 pub fn clear_session_secrets() {
-    *ACTIVE_RAW_PHRASE.lock().unwrap() = None;
-    *ACTIVE_TARGET_ADDR.lock().unwrap() = None;
-    *CACHED_TARGET_MATCH.lock().unwrap() = None;
-    CACHED_SOLUTIONS.lock().unwrap().clear();
+    {
+        let mut phrase = safe_lock(&ACTIVE_RAW_PHRASE);
+        if let Some(ref mut p) = *phrase {
+            crate::core::security::memory::secure_zero_string(p);
+        }
+        *phrase = None;
+    }
+    {
+        let mut target = safe_lock(&ACTIVE_TARGET_ADDR);
+        if let Some(ref mut t) = *target {
+            crate::core::security::memory::secure_zero_string(t);
+        }
+        *target = None;
+    }
+    {
+        let mut match_guard = safe_lock(&CACHED_TARGET_MATCH);
+        *match_guard = None;
+    }
+    {
+        let mut sols = safe_lock(&CACHED_SOLUTIONS);
+        for s in sols.iter_mut() {
+            crate::core::security::memory::secure_zero_string(s);
+        }
+        sols.clear();
+    }
 }
 
 pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
-    let active = ACTIVE_SESSION_ID.lock().unwrap();
+    let active = safe_lock(&ACTIVE_SESSION_ID);
     if active.as_deref() == Some(session_id) {
         CANCEL_FLAG.store(true, Ordering::SeqCst);
         clear_session_secrets();
@@ -160,7 +199,7 @@ pub fn request_cancel_session(session_id: &str) -> Result<bool, String> {
 }
 
 pub fn clear_recovery_session(session_id: &str) -> Result<bool, String> {
-    let mut active = ACTIVE_SESSION_ID.lock().unwrap();
+    let mut active = safe_lock(&ACTIVE_SESSION_ID);
     if active.as_deref() == Some(session_id) || active.is_some() {
         CANCEL_FLAG.store(true, Ordering::SeqCst);
         *active = None;
@@ -170,7 +209,7 @@ pub fn clear_recovery_session(session_id: &str) -> Result<bool, String> {
 }
 
 pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatusResponse, String> {
-    let active = ACTIVE_SESSION_ID.lock().unwrap().clone();
+    let active = safe_lock(&ACTIVE_SESSION_ID).clone();
     let is_active = active.as_deref() == Some(session_id);
 
     if is_active {
@@ -178,9 +217,7 @@ pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatus
         let total = TOTAL_COMBINATIONS.load(Ordering::Relaxed);
         let sol_cnt = SOLUTIONS_COUNT.load(Ordering::Relaxed);
 
-        let elapsed = SESSION_START_TIME
-            .lock()
-            .unwrap()
+        let elapsed = safe_lock(&SESSION_START_TIME)
             .map(|t| t.elapsed().as_secs_f64())
             .unwrap_or(0.0);
 
@@ -203,8 +240,8 @@ pub fn get_live_session_status(session_id: &str) -> Result<RecoverySessionStatus
             None
         };
 
-        let target_match = CACHED_TARGET_MATCH.lock().unwrap().clone();
-        let cached_sols = CACHED_SOLUTIONS.lock().unwrap().clone();
+        let target_match = safe_lock(&CACHED_TARGET_MATCH).clone();
+        let cached_sols = safe_lock(&CACHED_SOLUTIONS).clone();
 
         let status_str = if CANCEL_FLAG.load(Ordering::SeqCst) {
             "cancelled".to_string()
@@ -241,6 +278,7 @@ pub fn run_dual_word_session_worker(
     target_address: Option<String>,
     start_from_index: usize,
     _total_combinations: usize,
+    generation: usize,
 ) {
     std::thread::spawn(move || {
         // Parse words & identify missing slot positions
@@ -287,17 +325,17 @@ pub fn run_dual_word_session_worker(
 
         // Initialize active session tracker in RAM
         {
-            *ACTIVE_SESSION_ID.lock().unwrap() = Some(session_id.clone());
+            *safe_lock(&ACTIVE_SESSION_ID) = Some(session_id.clone());
             PAUSE_FLAG.store(false, Ordering::SeqCst);
             CANCEL_FLAG.store(false, Ordering::SeqCst);
             CURRENT_INDEX.store(start_from_index, Ordering::SeqCst);
             TOTAL_COMBINATIONS.store(effective_total_combinations, Ordering::SeqCst);
-            *SESSION_START_TIME.lock().unwrap() = Some(Instant::now());
+            *safe_lock(&SESSION_START_TIME) = Some(Instant::now());
         }
 
         let clean_target = target_address.as_ref().map(|s| s.trim().to_string());
         let mut found_target_match: Option<TargetAddressMatch> =
-            CACHED_TARGET_MATCH.lock().unwrap().clone();
+            safe_lock(&CACHED_TARGET_MATCH).clone();
 
         let extract_base_indices =
             |tokens: &[&str], missing: &[usize], wlist: &[&'static str]| -> [u16; 12] {
@@ -352,7 +390,7 @@ pub fn run_dual_word_session_worker(
                         .join(" ");
 
                     {
-                        let mut guard = CACHED_SOLUTIONS.lock().unwrap();
+                        let mut guard = safe_lock(&CACHED_SOLUTIONS);
                         if guard.len() < 1000 {
                             guard.push(phrase.clone());
                         }
@@ -365,13 +403,16 @@ pub fn run_dual_word_session_worker(
                                 check_target_match(target, &phrase, p1, word_list[w1 as usize])
                             {
                                 found_target_match = Some(m.clone());
-                                *CACHED_TARGET_MATCH.lock().unwrap() = Some(m);
+                                *safe_lock(&CACHED_TARGET_MATCH) = Some(m);
                             }
                         }
                     }
                 }
 
-                if PAUSE_FLAG.load(Ordering::Relaxed) || CANCEL_FLAG.load(Ordering::Relaxed) {
+                if PAUSE_FLAG.load(Ordering::Relaxed)
+                    || CANCEL_FLAG.load(Ordering::Relaxed)
+                    || SESSION_GENERATION.load(Ordering::Relaxed) != generation
+                {
                     break 'outer1;
                 }
             }
@@ -405,7 +446,7 @@ pub fn run_dual_word_session_worker(
                                 .join(" ");
 
                             {
-                                let mut guard = CACHED_SOLUTIONS.lock().unwrap();
+                                let mut guard = safe_lock(&CACHED_SOLUTIONS);
                                 if guard.len() < 1000 {
                                     guard.push(phrase.clone());
                                 }
@@ -421,13 +462,15 @@ pub fn run_dual_word_session_worker(
                                         word_list[w1 as usize],
                                     ) {
                                         found_target_match = Some(m.clone());
-                                        *CACHED_TARGET_MATCH.lock().unwrap() = Some(m);
+                                        *safe_lock(&CACHED_TARGET_MATCH) = Some(m);
                                     }
                                 }
                             }
                         }
 
-                        if PAUSE_FLAG.load(Ordering::Relaxed) || CANCEL_FLAG.load(Ordering::Relaxed)
+                        if PAUSE_FLAG.load(Ordering::Relaxed)
+                            || CANCEL_FLAG.load(Ordering::Relaxed)
+                            || SESSION_GENERATION.load(Ordering::Relaxed) != generation
                         {
                             break 'outer_all_pairs;
                         }
@@ -436,7 +479,11 @@ pub fn run_dual_word_session_worker(
             }
         }
 
-        if CANCEL_FLAG.load(Ordering::SeqCst) {
+        // Zeroize sensitive session parameters if cancelled or completed normally
+        if CANCEL_FLAG.load(Ordering::SeqCst)
+            || (!PAUSE_FLAG.load(Ordering::SeqCst)
+                && SESSION_GENERATION.load(Ordering::Relaxed) == generation)
+        {
             clear_session_secrets();
         }
     });

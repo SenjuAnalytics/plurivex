@@ -41,4 +41,5 @@ hmac = "0.12"
 ripemd = "0.1"
 bech32 = "0.9"
 rayon = "1.10"
+zeroize = { version = "1.9", features = ["alloc"] }
 

@@ -8,6 +8,7 @@ use ripemd::Ripemd160;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
 use sha3::Keccak256;
+use zeroize::Zeroize;
 
 type HmacSha512 = Hmac<Sha512>;
 
@@ -165,7 +166,7 @@ pub fn derive_dual_credentials_native(
         "seed" => {
             let mnemonic = Mnemonic::parse_normalized(t)
                 .map_err(|e| format!("Invalid BIP-39 mnemonic phrase: {}", e))?;
-            let seed_bytes = mnemonic.to_seed("");
+            let mut seed_bytes = mnemonic.to_seed("");
 
             // 1. EVM Derivation (BIP-44 path: m/44'/60'/0'/0/0)
             let path: DerivationPath = "m/44'/60'/0'/0/0"
@@ -173,12 +174,12 @@ pub fn derive_dual_credentials_native(
                 .map_err(|e| format!("Invalid derivation path: {}", e))?;
             let xprv = XPrv::derive_from_path(seed_bytes, &path)
                 .map_err(|e| format!("EVM HD derivation failed: {}", e))?;
-            let evm_pk_bytes: [u8; 32] = xprv.private_key().to_bytes().into();
+            let mut evm_pk_bytes: [u8; 32] = xprv.private_key().to_bytes().into();
             let (evm_address, evm_private_key) = evm_address_from_private_key(&evm_pk_bytes)?;
 
             // 2. Solana Derivation (SLIP-0010 path: m/44'/501'/0'/0')
             let sol_slip10_path = [44 | 0x80000000, 501 | 0x80000000, 0x80000000, 0x80000000];
-            let sol_seed_32 = slip10_derive_ed25519(&seed_bytes, &sol_slip10_path);
+            let mut sol_seed_32 = slip10_derive_ed25519(&seed_bytes, &sol_slip10_path);
             let (sol_address, sol_private_key) = solana_credentials_from_seed(&sol_seed_32);
 
             // 3. Bitcoin BIP-84 Native SegWit (path: m/84'/0'/0'/0/0) -> bc1q...
@@ -211,6 +212,11 @@ pub fn derive_dual_credentials_native(
                 Err(_) => None,
             };
 
+            // Scrub intermediate raw key material from RAM
+            seed_bytes.zeroize();
+            evm_pk_bytes.zeroize();
+            sol_seed_32.zeroize();
+
             Ok(DualCredentials {
                 evm_address: Some(evm_address),
                 sol_address: Some(sol_address),
@@ -223,7 +229,7 @@ pub fn derive_dual_credentials_native(
         }
         "pk" => {
             let clean_hex = t.trim().trim_start_matches("0x").trim_start_matches("0X");
-            let pk_bytes_vec =
+            let mut pk_bytes_vec =
                 hex::decode(clean_hex).map_err(|e| format!("Invalid hex private key: {}", e))?;
             if pk_bytes_vec.len() != 32 {
                 return Err("EVM Private Key must be exactly 32 bytes (64 hex characters)".into());
@@ -239,6 +245,10 @@ pub fn derive_dual_credentials_native(
                     Err(_) => (None, None, None),
                 };
 
+            // Scrub intermediate raw key material from RAM
+            pk_bytes.zeroize();
+            pk_bytes_vec.zeroize();
+
             Ok(DualCredentials {
                 evm_address: Some(evm_address),
                 sol_address: Some(sol_address),
@@ -250,10 +260,10 @@ pub fn derive_dual_credentials_native(
             })
         }
         "sol_pk" => {
-            let decoded = bs58::decode(t)
+            let mut decoded = bs58::decode(t)
                 .into_vec()
                 .map_err(|e| format!("Invalid Base58 key: {}", e))?;
-            let raw32: [u8; 32] = if decoded.len() == 64 {
+            let mut raw32: [u8; 32] = if decoded.len() == 64 {
                 let mut buf = [0u8; 32];
                 buf.copy_from_slice(&decoded[0..32]);
                 buf
@@ -270,6 +280,10 @@ pub fn derive_dual_credentials_native(
 
             let (sol_address, sol_private_key) = solana_credentials_from_seed(&raw32);
             let (evm_address, evm_private_key) = evm_address_from_private_key(&raw32)?;
+
+            // Scrub intermediate raw key material from RAM
+            decoded.zeroize();
+            raw32.zeroize();
 
             Ok(DualCredentials {
                 evm_address: Some(evm_address),

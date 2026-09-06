@@ -1,9 +1,23 @@
-use std::ptr;
 use std::sync::atomic::{compiler_fence, Ordering};
+pub use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Secure buffer that is automatically zeroed out from RAM upon drop
 pub struct SecureBuffer {
     data: Vec<u8>,
+}
+
+impl Zeroize for SecureBuffer {
+    fn zeroize(&mut self) {
+        self.data.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecureBuffer {}
+
+impl Drop for SecureBuffer {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
 }
 
 impl SecureBuffer {
@@ -24,20 +38,19 @@ impl SecureBuffer {
     }
 }
 
-impl Drop for SecureBuffer {
-    fn drop(&mut self) {
-        secure_zero_slice(&mut self.data);
-    }
-}
-
 /// Overwrite any mutable byte slice with zeroes and invoke compiler fence
 /// ensuring memory is cleared even with compiler optimizations enabled.
 pub fn secure_zero_slice(slice: &mut [u8]) {
-    for byte in slice.iter_mut() {
-        unsafe {
-            ptr::write_volatile(byte, 0);
-        }
+    slice.zeroize();
+    compiler_fence(Ordering::SeqCst);
+}
+
+/// Overwrite a mutable string buffer with zeroes in RAM and clear it
+pub fn secure_zero_string(s: &mut String) {
+    unsafe {
+        s.as_bytes_mut().zeroize();
     }
+    s.clear();
     compiler_fence(Ordering::SeqCst);
 }
 
