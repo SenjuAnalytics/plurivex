@@ -877,6 +877,16 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
     - **F11 (Eliminasi Race Condition Worker Inisialisasi State)**: Memindahkan blok inisialisasi state sesi (`ACTIVE_SESSION_ID`, `CANCEL_FLAG`, `CURRENT_INDEX`, dll.) keluar dari closure thread spawn ke thread pemanggil (`run_dual_word_session_worker`) sebelum `std::thread::spawn` dieksekusi. Menambahkan guard abort cepat jika thread telah dibatalkan/superseded (`SESSION_GENERATION != generation || CANCEL_FLAG`). Menghapus delay artifisial `std::thread::sleep(50ms)` dari unit test.
     - **Verifikasi Deterministik Raw Tx Sealed vs Direct**: Memperbarui unit test `test_sealed_evm_and_solana_signing_roundtrip` dengan `assert_eq!` eksplisit antara `raw_tx` command sealed dan `sign_evm_transfer_with_secret` langsung, serta `raw_tx_base64` sealed Solana dan `sign_solana_transfer_with_secret` langsung. Membuktikan secara matematis tidak ada mutasi apa pun pada payload transaksi antara dekripsi vault dan signing.
 
+18. **🎯 Sinkronisasi Evaluasi 11-Kata & Rute Worker Single-Word (`recovery_session.rs`)**
+    - **Akar Masalah**: Evaluasi frasa 11 kata tanpa placeholder sebelumnya menghasilkan nilai total kombinasi 2048 di thread inisiasi, namun worker mengeksekusi loop dual-word 4.194.304 iterasi karena mendeteksi `missing_word_indices.is_empty()`.
+    - **Resolusi**:
+      - Menyinkronkan deteksi single-missing: `(tokens.len() == 12 && missing_count == 1) || (tokens.len() == 11 && missing_count == 0)`.
+      - Menetapkan slot indeks 11 sebagai missing word jika input terdiri dari 11 token tanpa placeholder (`missing_word_indices = [11]`), mengarahkan worker ke loop single-word 2048 kombinasi (2048x lebih cepat, selesai instan).
+      - Menghilangkan bug UI di mana persentase progress sebelumnya melompat melebihi 100%.
+      - Menambahkan unit test `test_eleven_words_without_placeholder_completes_2048_combinations`. Total pengujian bertambah menjadi **53 unit test** (52 lintas platform + 1 Windows).
+
+
+
 
 
 

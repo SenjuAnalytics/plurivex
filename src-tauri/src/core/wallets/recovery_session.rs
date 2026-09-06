@@ -65,8 +65,10 @@ pub fn start_in_memory_session(
             missing_count += 1;
         }
     }
+    let is_single_missing = (tokens.len() == 12 && missing_count == 1)
+        || (tokens.len() == 11 && missing_count == 0);
     let is_all_66_pairs = tokens.len() == 10 && missing_count == 0;
-    let total_combinations = if missing_count == 1 || (tokens.len() == 11 && missing_count == 0) {
+    let total_combinations = if is_single_missing {
         2048
     } else if is_all_66_pairs {
         66 * 4_194_304
@@ -334,6 +336,14 @@ pub fn run_dual_word_session_worker(
             }
         }
 
+        // If user entered 11 words without placeholder, the 12th slot (index 11) is missing
+        if tokens.len() == 11 && missing_word_indices.is_empty() {
+            missing_word_indices.push(11);
+        } else if tokens.len() == 11 && missing_word_indices.len() == 1 {
+            // 10 words + 1 placeholder: both the placeholder and the omitted 12th slot (index 11) are missing
+            missing_word_indices.push(11);
+        }
+
         let is_all_66_pairs = tokens.len() == 10 && missing_word_indices.is_empty();
         let all_pairs: Vec<(usize, usize)> = if is_all_66_pairs {
             let mut pairs = Vec::with_capacity(66);
@@ -583,4 +593,37 @@ mod tests {
         assert!(safe_lock(&CACHED_SOLUTIONS).is_empty());
         assert!(safe_lock(&CACHED_TARGET_MATCH).is_none());
     }
+
+    #[test]
+    fn test_eleven_words_without_placeholder_completes_2048_combinations() {
+        let _guard = safe_lock(&TEST_LOCK);
+        // 11 words without placeholder -> auto-detects missing 12th word, exactly 2048 combinations
+        let phrase =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+                .to_string();
+        let res = start_in_memory_session(phrase, None, "auto".to_string()).unwrap();
+        assert_eq!(res.total_combinations, 2048);
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let status = get_live_session_status(&res.session_id).unwrap();
+            if status.status == "completed" {
+                assert_eq!(status.total_combinations, 2048);
+                assert_eq!(status.current_index, 2048);
+                assert_eq!(status.percent, 100.0);
+                assert!(status.solutions_count > 0);
+                assert!(!status.recent_solutions.is_empty());
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Worker timeout: 11 words recovery did not complete in 5s"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        let clear_res = clear_recovery_session(&res.session_id).unwrap();
+        assert!(clear_res);
+    }
 }
+
