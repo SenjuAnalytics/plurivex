@@ -964,3 +964,17 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
     - **Penyelesaian Residual D: Ketahanan Mutex Poisoning (`session.rs`)**:
       - Memperbarui seluruh pemanggilan mutex lock pada `SessionManager` (`unlock`, `lock`, `is_authenticated`, `get_master_key`, `is_locked`) menggunakan `.unwrap_or_else(|e| e.into_inner())` guna menjamin sesi tidak lumpuh jika terjadi panic pada thread lain.
     - **Total Pengujian**: **59 unit test** lolos (58 cross-platform + 1 Windows clipboard), Clippy 0 warning, Vite & TypeScript build 100% bersih.
+
+---
+
+### 📌 Agenda Rekayasa Keamanan Masa Depan (Post-K3 Dedicated Backlog)
+
+Sesuai dengan kesepakatan penutupan audit K3 (commit `b49afd9` - **ACCEPT**), inisiatif arsitektur berikut dijadwalkan secara resmi pada milestone independen tersendiri:
+
+* **TASK-SEC-01: Pencabutan `sql:allow-execute` & Isolasi 100% SQLite ke Native Rust IPC**
+  * **Tujuan**: Mengisolasi database SQLite lokal seutuhnya di sisi Rust backend, menutup akses eksekusi SQL mentah dari webview frontend, dan mengeliminasi sisa permukaan ancaman manipulasi basis data jika terjadi insiden XSS.
+  * **Ruang Lingkup**:
+    1. Memindahkan 18 pemanggilan `database.execute` dan 10 pemanggilan `database.select` di `src/lib/db.ts` ke dalam sekumpulan typed Rust IPC commands (`vault_get_wallets_public`, `vault_update_wallet_label`, `vault_delete_wallet`, `vault_upsert_balances`, dll.).
+    2. Menghapus izin `sql:allow-execute` dari `src-tauri/capabilities/default.json`.
+    3. Frontend murni bertindak sebagai *dumb UI* yang hanya membaca dan mengirim data via IPC command ber-otorisasi.
+  * **Status**: ⏳ **Dijadwalkan untuk Dedicated Milestone (Tidak dicampur ke Hotfix K3)**.

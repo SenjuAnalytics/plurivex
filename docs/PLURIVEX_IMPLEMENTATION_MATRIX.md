@@ -36,7 +36,7 @@ Dokumen ini merupakan turunan operasional 1:1 (*direct downstream operational tr
 | **6** | True Dual-Chain Key Derivation (EVM + Solana) | `core/wallets/derivation.rs` (Live Source of Truth) | `AddWalletModal.tsx` | `vault_derive_credentials` [Live IPC] | BIP-39 & SLIP-0010 Official Test Vectors Pass | 🟢 Complete & Live (Fase 0) |
 | **7** | Smart Universal Parser & File Extractor | `core/wallets/import.rs` (Live Source of Truth) | `ImportModal.tsx` | `scan_directory_native` [Live IPC] | 10.000 Lines Stress Test (< 1.5s) | 🟢 Complete & Live (Fase 0) |
 | **8** | Anti-Duplicate Guard (Deduplikasi Hash) | `lib/fingerprint.ts` & `core/wallets/fingerprint.rs` (Live Source of Truth) | `ImportPanel.tsx` | `walletFingerprint` / `calculate_fingerprint` (SHA-256 Base64 Canonical) | SHA-256 Collision & Deduplication Test (Rust + TS) | 🟢 Complete & Live (Fase 0) |
-| **9** | Zero-Cloud SQLite Encrypted Vault | `core/security/crypto.rs` (Live Source of Truth) | `App.tsx` (Unlock Screen) | `vault_encrypt`, `vault_decrypt` [Live IPC] | Argon2id + AES-GCM 100% Roundtrip Pass | 🟢 Complete & Live (Fase 0) |
+| **9** | Zero-Cloud SQLite Encrypted Vault | `core/security/crypto.rs` & `session.rs` (Live Source of Truth) | `App.tsx` (Unlock Screen) | `vault_session_unlock`, `vault_session_unlock_with_pin`, `vault_setup_pin_scoped`, `vault_encrypt_with_session`, `vault_encrypt_batch_with_session` [Live IPC] | Argon2id + AES-GCM + Scoped Session 100% Pass | 🟢 Complete & Live (Fase 0 - K3 Hardened) |
 | **10** | Mnemonic Typo Repair Tool (Rayon Zero-Disk) | `core/wallets/repair/` & `recovery_session.rs` (Live Source of Truth) | `RepairWorkspace.tsx` | `vault_repair_mnemonic`, `start_recovery_session`, `clear_recovery_session` [Live IPC] | Rayon Multi-Core 4.19M Combinations Pass + RAM Zeroize | 🟢 Complete & Live (Fase 1) |
 | **11** | Deep Sub-Account Derivation Scan | `core/wallets/subaccounts.rs` (Planned Target) | `SubAccountScanner.tsx` | `scan_hd_subaccounts` [Planned IPC] | Derivation Index 0–50 Concurrency Test Pass | ⏳ Planned (Fase 1) |
 | **12** | Batch Wallet Generator | `core/wallets/generator.rs` (Planned Target) | `BatchGenerateModal.tsx` | `vault_batch_generate` [Planned IPC] | 1.000 Wallets Creation < 2.5s (Reference HW) | ⏳ Planned (Fase 1) |
@@ -100,6 +100,16 @@ Dokumen ini merupakan turunan operasional 1:1 (*direct downstream operational tr
 | **TASK-102** | **Fitur #12: Batch Wallet Generator** | `src-tauri/src/core/wallets/generator.rs` | `src/components/BatchGenerateModal.tsx` | ⏳ Siap Bangun (Rayon + BIP-44 Derivation) |
 | **TASK-103** | **Fitur #40: QR Code Generator & Mobile Deposit Hub** | `src-tauri/src/core/wallets/qr.rs` | `src/components/DepositQrModal.tsx` | ⏳ Siap Bangun (`qrcode` crate + SVG render) |
 | **TASK-104** | **Fitur #11: Deep Sub-Account Derivation Scan** | `src-tauri/src/core/wallets/subaccounts.rs`| `src/components/SubAccountScannerModal.tsx` | ⏳ Siap Bangun (HD Path Index 0–50) |
+
+---
+
+## 🛡️ 4. Agenda Pengerasan Arsitektur Keamanan (*Security Hardening Backlog*)
+
+Inisiatif rekayasa keamanan masa depan yang dijadwalkan secara terpisah (*dedicated milestone*) pasca-pencapaian K3 Penuh:
+
+| Task ID | Inisiatif Rekayasa Keamanan | Target Komponen | Deskripsi Rekayasa | Gerbang Mutu / Target Rilis | Status Eksekusi |
+| :---: | :--- | :--- | :--- | :--- | :---: |
+| **TASK-SEC-01** | **Pencabutan `sql:allow-execute` & Isolasi 100% SQLite ke Native Rust IPC** | `src-tauri/src/db/`<br>`capabilities/default.json`<br>`src/lib/db.ts` | Memindahkan seluruh eksekusi query SQL mentah di `src/lib/db.ts` (18 pemanggilan `database.execute` dan 10 pemanggilan `database.select`) ke dalam typed scoped Rust IPC commands (`vault_get_wallets_public`, `vault_update_wallet_label`, `vault_delete_wallet`, `vault_delete_all_wallets`, `vault_upsert_balances`). Setelah frontend murni memanggil endpoint IPC Rust yang terisolasi, izin `sql:allow-execute` dicabut dari antarmuka webview untuk memblokir total kemungkinan manipulasi database lokal jika terjadi insiden XSS. | 0 Query SQL Mentah di JS + Pencabutan `sql:allow-execute` dari ACL | ⏳ **Scheduled (Post-K3 Dedicated Milestone)** |
 
 ---
 
