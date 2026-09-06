@@ -53,6 +53,7 @@ interface AppContextValue {
   exportWallets: (format: "txt" | "csv") => Promise<void>;
   exportWalletsWithOptions: (options: ExportOptions) => Promise<void>;
   revealSecret: (id: number) => Promise<string | null>;
+  masterPw: string;
   autoLockMinutes: number;
   setAutoLockMinutes: (mins: number) => void;
   isAirGapped: boolean;
@@ -198,6 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     exportWallets: walletOps.exportWallets,
     exportWalletsWithOptions: walletOps.exportWalletsWithOptions,
     revealSecret: auth.revealSecret,
+    masterPw: auth.masterPw,
     autoLockMinutes: auth.autoLockMinutes,
     setAutoLockMinutes: auth.setAutoLockMinutes,
     isAirGapped: scanner.isAirGapped,

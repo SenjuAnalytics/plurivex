@@ -237,7 +237,8 @@ export interface SweepTxResult {
 
 export async function executeSweepSingle(
   walletId: number,
-  secret: string,
+  encryptedSecret: string,
+  masterPw: string,
   walletType: WalletType,
   chainKey: string,
   recipientAddress: string,
@@ -252,8 +253,9 @@ export async function executeSweepSingle(
       let fromAddress = senderAddress;
       if (!fromAddress) {
         try {
-          fromAddress = await invoke<string>("get_solana_address", {
-            secret,
+          fromAddress = await invoke<string>("get_solana_address_sealed", {
+            encryptedSecret,
+            masterPw,
             walletType,
           });
         } catch {
@@ -261,7 +263,7 @@ export async function executeSweepSingle(
             walletId,
             address: recipientAddress,
             success: false,
-            error: "Invalid Solana secret key or mnemonic",
+            error: "Invalid Solana sealed secret or master password",
           };
         }
       }
@@ -346,14 +348,15 @@ export async function executeSweepSingle(
         }
       }
 
-      // Sign transaction offline natively in Rust (Zero-Disk & Zero-Webview key exposure)
+      // Sign transaction offline natively in Rust using sealed vault credentials (Zero-Webview key exposure)
       interface SolanaSignResult {
         rawTxBase64: string;
         fromAddress: string;
       }
 
-      const signResult = await invoke<SolanaSignResult>("sign_solana_transfer", {
-        secret,
+      const signResult = await invoke<SolanaSignResult>("sign_solana_transfer_sealed", {
+        encryptedSecret,
+        masterPw,
         walletType,
         tx: {
           recipient: recipientAddress.trim(),
@@ -398,12 +401,13 @@ export async function executeSweepSingle(
   }
 
   // 2. EVM Sweep Execution
-  // Derivation done natively in Rust (Zero key exposure in webview memory)
+  // Derivation done natively in Rust using sealed credentials (Zero key exposure in webview memory)
   let fromAddress = senderAddress;
   if (!fromAddress) {
     try {
-      fromAddress = await invoke<string>("get_evm_address", {
-        secret,
+      fromAddress = await invoke<string>("get_evm_address_sealed", {
+        encryptedSecret,
+        masterPw,
         walletType,
       });
     } catch {
@@ -411,7 +415,7 @@ export async function executeSweepSingle(
         walletId,
         address: recipientAddress,
         success: false,
-        error: "Invalid wallet type or secret for EVM",
+        error: "Invalid wallet type or sealed secret for EVM",
       };
     }
   }
@@ -421,7 +425,7 @@ export async function executeSweepSingle(
       walletId,
       address: recipientAddress,
       success: false,
-      error: "Invalid wallet type or secret for EVM",
+      error: "Invalid wallet type or sealed secret for EVM",
     };
   }
 
@@ -451,14 +455,15 @@ export async function executeSweepSingle(
 
     const netAmount = balance.sub(fee);
 
-    // Sign transaction offline natively in Rust (Zero-Disk & Zero-Webview key exposure)
+    // Sign transaction offline natively in Rust using sealed vault credentials (Zero-Webview key exposure)
     interface EvmSignResult {
       rawTx: string;
       fromAddress: string;
     }
 
-    const signResult = await invoke<EvmSignResult>("sign_evm_transfer", {
-      secret,
+    const signResult = await invoke<EvmSignResult>("sign_evm_transfer_sealed", {
+      encryptedSecret,
+      masterPw,
       walletType,
       tx: {
         chainId: cfg.chainId,

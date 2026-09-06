@@ -25,12 +25,12 @@ commands.allow = ["broadcast_raw_tx", "broadcast_solana_tx"]
 
 [[permission]]
 identifier = "allow-native-signing"
-description = "Derive addresses and sign transactions natively (no network)"
+description = "Derive addresses and sign transactions natively using sealed vault credentials (no network)"
 commands.allow = [
-  "sign_evm_transfer",
-  "get_evm_address",
-  "sign_solana_transfer",
-  "get_solana_address"
+  "sign_evm_transfer_sealed",
+  "get_evm_address_sealed",
+  "sign_solana_transfer_sealed",
+  "get_solana_address_sealed"
 ]
 
 [[permission]]

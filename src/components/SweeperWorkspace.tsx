@@ -32,7 +32,7 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
     wallets,
     selectedSweepIds,
     selectAllFunded,
-    revealSecret,
+    masterPw,
     scanAll,
     toast,
   } = useApp();
@@ -135,6 +135,10 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
       toast(isEvmChain ? "Please enter a valid EVM destination address (0x...)" : "Please enter a valid Solana Base58 destination address", "error");
       return;
     }
+    if (!masterPw) {
+      toast("Vault is locked. Please unlock your vault before sweeping.", "error");
+      return;
+    }
     if (sweepableWallets.length === 0) {
       toast("No sweepable wallets found for this network (balances are lower than gas fee)", "error");
       return;
@@ -153,16 +157,10 @@ export function SweeperWorkspace({ onBack }: { onBack?: () => void }) {
         msg: `Broadcasting from wallet ${shortAddr(getWalletTargetAddr(w, isEvmChain))}...`,
       });
 
-      const secret = await revealSecret(w.id);
-      if (!secret) {
-        results[w.id] = { walletId: w.id, address: getWalletTargetAddr(w, isEvmChain), success: false, error: "Failed to decrypt key" };
-        failCount++;
-        continue;
-      }
-
       const res = await executeSweepSingle(
         w.id,
-        secret,
+        w.encryptedSecret,
+        masterPw,
         w.type,
         chainKey,
         recipient.trim(),

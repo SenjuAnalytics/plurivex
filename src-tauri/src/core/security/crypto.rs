@@ -90,13 +90,13 @@ pub fn encrypt_vault_batch(plaintexts: &[String], password: &str) -> Result<Vec<
     Ok(results)
 }
 
-/// Decrypt ciphertext blob supporting both modern Argon2id (PLX1) and legacy PBKDF2
-pub fn decrypt_vault(blob: &str, password: &str) -> Result<String, String> {
+/// Decrypt ciphertext blob into a Zeroizing<String> buffer (supporting modern Argon2id PLX1 and legacy PBKDF2)
+pub fn decrypt_vault_zeroizing(blob: &str, password: &str) -> Result<zeroize::Zeroizing<String>, String> {
     let packed = BASE64
         .decode(blob.trim())
         .map_err(|e| format!("Base64 decode failed: {}", e))?;
 
-    if packed.starts_with(MAGIC_PLX1) {
+    let decrypted = if packed.starts_with(MAGIC_PLX1) {
         // Modern Argon2id format
         if packed.len() < 4 + SALT_LEN + IV_LEN {
             return Err("Argon2id blob too short".to_string());
@@ -108,10 +108,9 @@ pub fn decrypt_vault(blob: &str, password: &str) -> Result<String, String> {
         let key = derive_argon2id_key(password, salt)?;
         let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
         let nonce = Nonce::from_slice(iv);
-        let decrypted = cipher
+        cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|_| "Decryption failed (Invalid password)".to_string())?;
-        String::from_utf8(decrypted).map_err(|e| format!("UTF-8 decoding error: {}", e))
+            .map_err(|_| "Decryption failed (Invalid password)".to_string())?
     } else {
         // Legacy PBKDF2 format
         if packed.len() < SALT_LEN + IV_LEN {
@@ -124,11 +123,18 @@ pub fn decrypt_vault(blob: &str, password: &str) -> Result<String, String> {
         let key = derive_pbkdf2_key(password, salt);
         let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
         let nonce = Nonce::from_slice(iv);
-        let decrypted = cipher
+        cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|_| "Decryption failed (Invalid password)".to_string())?;
-        String::from_utf8(decrypted).map_err(|e| format!("UTF-8 decoding error: {}", e))
-    }
+            .map_err(|_| "Decryption failed (Invalid password)".to_string())?
+    };
+
+    let plaintext = String::from_utf8(decrypted).map_err(|e| format!("UTF-8 decoding error: {}", e))?;
+    Ok(zeroize::Zeroizing::new(plaintext))
+}
+
+/// Decrypt ciphertext blob supporting both modern Argon2id (PLX1) and legacy PBKDF2
+pub fn decrypt_vault(blob: &str, password: &str) -> Result<String, String> {
+    decrypt_vault_zeroizing(blob, password).map(|z| (*z).clone())
 }
 
 /// Create verification token for password authentication
@@ -159,8 +165,12 @@ mod tests {
         let decrypted = decrypt_vault(&encrypted, password).expect("Decryption failed");
         assert_eq!(decrypted, secret);
 
+        let zeroized = decrypt_vault_zeroizing(&encrypted, password).expect("Zeroizing decryption failed");
+        assert_eq!(&*zeroized, secret);
+
         // Wrong password must fail
         assert!(decrypt_vault(&encrypted, "WrongPassword!").is_err());
+        assert!(decrypt_vault_zeroizing(&encrypted, "WrongPassword!").is_err());
     }
 
     #[test]

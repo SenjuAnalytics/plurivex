@@ -552,6 +552,7 @@ mod tests {
         let cancel_res = request_cancel_session(&res.session_id).unwrap();
         assert!(cancel_res);
         let _ = clear_recovery_session(&res.session_id);
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     #[test]

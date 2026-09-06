@@ -476,12 +476,14 @@ pub struct EvmSignResult {
 }
 
 #[tauri::command]
-pub fn sign_evm_transfer(
-    secret: String,
+pub fn sign_evm_transfer_sealed(
+    encrypted_secret: String,
+    master_pw: String,
     wallet_type: String,
     tx: EvmTransferPayload,
 ) -> Result<EvmSignResult, String> {
-    let mut secret = zeroize::Zeroizing::new(secret);
+    let mut master_pw = zeroize::Zeroizing::new(master_pw);
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_pw)?;
     let from_address = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type)?;
     let params = crate::core::wallets::signing::EvmTransferParams {
         chain_id: tx.chain_id,
@@ -496,8 +498,7 @@ pub fn sign_evm_transfer(
         &wallet_type,
         &params,
     )?;
-    // Explicit wipe before drop (plus Zeroizing<String> drops and zeroes unconditionally on any exit path)
-    crate::core::security::memory::secure_zero_string(&mut secret);
+    crate::core::security::memory::secure_zero_string(&mut master_pw);
     Ok(EvmSignResult {
         raw_tx,
         from_address,
@@ -505,10 +506,15 @@ pub fn sign_evm_transfer(
 }
 
 #[tauri::command]
-pub fn get_evm_address(secret: String, wallet_type: String) -> Result<String, String> {
-    let mut secret = zeroize::Zeroizing::new(secret);
+pub fn get_evm_address_sealed(
+    encrypted_secret: String,
+    master_pw: String,
+    wallet_type: String,
+) -> Result<String, String> {
+    let mut master_pw = zeroize::Zeroizing::new(master_pw);
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_pw)?;
     let res = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type);
-    crate::core::security::memory::secure_zero_string(&mut secret);
+    crate::core::security::memory::secure_zero_string(&mut master_pw);
     res
 }
 
@@ -546,7 +552,10 @@ where
         where
             E: serde::de::Error,
         {
-            if v >= 0.0 && v <= u64::MAX as f64 {
+            if v.fract() != 0.0 {
+                return Err(serde::de::Error::custom("lamports cannot be a fractional float"));
+            }
+            if (0.0..18446744073709551616.0).contains(&v) {
                 Ok(v as u64)
             } else {
                 Err(serde::de::Error::custom("out of range for u64"))
@@ -577,12 +586,14 @@ pub struct SolanaTransferPayload {
 }
 
 #[tauri::command]
-pub fn sign_solana_transfer(
-    secret: String,
+pub fn sign_solana_transfer_sealed(
+    encrypted_secret: String,
+    master_pw: String,
     wallet_type: String,
     tx: SolanaTransferPayload,
 ) -> Result<crate::core::wallets::solana_signing::SolanaSignResult, String> {
-    let mut secret = zeroize::Zeroizing::new(secret);
+    let mut master_pw = zeroize::Zeroizing::new(master_pw);
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_pw)?;
     let params = crate::core::wallets::solana_signing::SolanaTransferParams {
         recipient: &tx.recipient,
         lamports: tx.lamports,
@@ -594,15 +605,20 @@ pub fn sign_solana_transfer(
         &wallet_type,
         &params,
     );
-    crate::core::security::memory::secure_zero_string(&mut secret);
+    crate::core::security::memory::secure_zero_string(&mut master_pw);
     res
 }
 
 #[tauri::command]
-pub fn get_solana_address(secret: String, wallet_type: String) -> Result<String, String> {
-    let mut secret = zeroize::Zeroizing::new(secret);
+pub fn get_solana_address_sealed(
+    encrypted_secret: String,
+    master_pw: String,
+    wallet_type: String,
+) -> Result<String, String> {
+    let mut master_pw = zeroize::Zeroizing::new(master_pw);
+    let secret = crate::core::security::crypto::decrypt_vault_zeroizing(&encrypted_secret, &master_pw)?;
     let res = crate::core::wallets::solana_signing::derive_solana_address_from_secret(&secret, &wallet_type);
-    crate::core::security::memory::secure_zero_string(&mut secret);
+    crate::core::security::memory::secure_zero_string(&mut master_pw);
     res
 }
 
@@ -638,6 +654,55 @@ mod tests {
         }"#;
         let payload2: SolanaTransferPayload = serde_json::from_str(json_string).unwrap();
         assert_eq!(payload2.lamports, u64::MAX);
+    }
+
+    #[test]
+    fn test_sealed_evm_and_solana_signing_roundtrip() {
+        let password = "TestMasterPassword!999";
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let encrypted = crate::core::security::crypto::encrypt_vault(mnemonic, password).unwrap();
+
+        // 1. Test EVM sealed signing
+        let evm_tx = EvmTransferPayload {
+            chain_id: 1,
+            to_address: "0x0000000000000000000000000000000000000001".to_string(),
+            value_wei_hex: "0x01".to_string(),
+            gas_price_wei_hex: "0x01".to_string(),
+            gas_limit: 21000,
+            nonce: 0,
+        };
+        let evm_result = sign_evm_transfer_sealed(
+            encrypted.clone(),
+            password.to_string(),
+            "seed".to_string(),
+            evm_tx,
+        ).unwrap();
+        assert_eq!(evm_result.from_address.to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
+        assert!(evm_result.raw_tx.starts_with("0x"));
+
+        // Test EVM address derivation sealed
+        let derived_evm_addr = get_evm_address_sealed(encrypted.clone(), password.to_string(), "seed".to_string()).unwrap();
+        assert_eq!(derived_evm_addr.to_lowercase(), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
+
+        // 2. Test Solana sealed signing
+        let sol_tx = SolanaTransferPayload {
+            recipient: "11111111111111111111111111111112".to_string(),
+            lamports: 1_000_000,
+            recent_blockhash: "EkSnNWid2cvwEVnPx9aZaWBrespocAcjwn4SXSpMmMQx".to_string(),
+            is_nonce_account: false,
+        };
+        let sol_result = sign_solana_transfer_sealed(
+            encrypted.clone(),
+            password.to_string(),
+            "seed".to_string(),
+            sol_tx,
+        ).unwrap();
+        assert_eq!(sol_result.from_address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+        assert!(!sol_result.raw_tx_base64.is_empty());
+
+        // Test Solana address derivation sealed
+        let derived_sol_addr = get_solana_address_sealed(encrypted, password.to_string(), "seed".to_string()).unwrap();
+        assert_eq!(derived_sol_addr, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
     }
 
     #[test]

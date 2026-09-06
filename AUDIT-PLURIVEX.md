@@ -93,7 +93,7 @@ Padahal `src/lib/crypto.ts` baris 6 ditulis komentar:
 
 **Dampak:** private key mentah ada di memory webview Chromium → bisa kena XSS, devtools, memory dump webview. Untuk aplikasi yang menjual diri sebagai *"Zero-Disk Forensics Security Vault"*, ini kontradiksi terbesar di kodebase.
 
-*(Catatan Progres: Seluruh derivasi kunci dan penandatanganan transaksi (EVM & Solana) pada alur sweeper kini 100% dieksekusi di backend Rust — lihat poin 12, 13, 14, dan 15 pada Revisi v5. Webview hanya memegang secret terenkripsi dan plaintext sementara selama payload IPC dikirim ke Rust; eliminasi total transmisi plaintext dari webview akan dituntaskan pada K3-lite).*
+*(Catatan Selesai: Arsitektur "Zero key exposure in webview memory" kini telah tercapai 100% pada alur sweeper melalui implementasi K3-lite — lihat poin 12 s.d. 16 pada Revisi v5. Webview hanya memegang ciphertext vault dan master password; dekripsi, derivasi, dan signing dilakukan secara eksklusif di dalam memori backend Rust via command sealed).*
 
 ---
 
@@ -859,7 +859,20 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
     - **F7 (`Zeroizing<String>` Anti-Leak Guard)**: Membungkus argumen secret dalam `zeroize::Zeroizing<String>` di seluruh Tauri command (`sign_evm_transfer`, `get_evm_address`, `sign_solana_transfer`, `get_solana_address`), menjamin buffer memori heap String di-zeroize seketika pada semua jalur keluar (termasuk early-return operator `?` saat error dan panic). Dilengkapi unit test `test_zeroizing_secret_cleanup`.
     - **F8 (Lossless Deserialisasi Lamports)**: Mendukung deserialisasi `lamports` u64 baik dari format angka maupun string desimal (`deserialize_u64_from_number_or_str`), menjaga presisi penuh di atas $2^{53}$ lamports tanpa pembulatan floating point. Dilengkapi unit test `test_solana_transfer_payload_deserialize_number_and_string`.
     - **F10 (Pemisahan Granular Permission)**: Memisahkan permission Tauri menjadi `allow-tx-broadcast` (khusus broadcast network) dan `allow-native-signing` (khusus derivasi & offline signing) di `allow-rpc-get-balance.toml` dan `default.json`.
-    - **Total Pengujian**: **51 unit test** (50 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
+
+16. **🔒 K3-lite — Sealed Vault Transaction Signing di Rust (Zero Key Exposure Selesai)**
+    - **In-Memory Zeroizing Vault Decryption (`crypto.rs`)**: Menambahkan fungsi `decrypt_vault_zeroizing` yang mendekripsi ciphertext PLX1 (Argon2id + AES-256-GCM) langsung ke buffer `zeroize::Zeroizing<String>`, menjamin pemusnahan otomatis dari heap RAM saat keluar dari scope. Dilengkapi unit test `test_argon2id_zeroizing_decryption`.
+    - **Sealed IPC Commands (`commands.rs`, `lib.rs`, `allow-rpc-get-balance.toml`)**:
+      - Mengganti command unsealed dengan `sign_evm_transfer_sealed`, `get_evm_address_sealed`, `sign_solana_transfer_sealed`, dan `get_solana_address_sealed`.
+      - Command menerima `encrypted_secret` (ciphertext DB) dan `master_pw`. Dekripsi, derivasi alamat publik, dan penandatanganan transaksi dieksekusi 100% di backend Rust.
+      - Menghapus total command signing unsealed dari `lib.rs` dan whitelist permission security guna mencegah celah downgrade atau bypass.
+      - Dilengkapi unit test roundtrip `test_sealed_evm_and_solana_signing_roundtrip`.
+    - **Frontend Sweeper Hardening (`SweeperWorkspace.tsx`, `sweeper.ts`, `AppContext.tsx`)**:
+      - Menghapus pemanggilan `revealSecret` dari alur sweep di `SweeperWorkspace.tsx`.
+      - Webview kini murni meneruskan `w.encryptedSecret` dan `masterPw` ke Rust tanpa pernah mendekripsi atau menginstansiasi plaintext private key di memori JavaScript/V8.
+      - Plaintext private key **0% terpapar di heap runtime JavaScript** selama seluruh siklus hidup sweep.
+    - **Total Pengujian**: **52 unit test** (51 unit test lintas-platform Linux/Windows + 1 unit test khusus Windows clipboard).
+
 
 
 
