@@ -40,7 +40,9 @@ Aplikasi ini menggabungkan manajemen identitas kunci multi-chain (EVM, Solana, d
 - **Proteksi Ekspor Plaintext (Guardrail)**: Dialog konfirmasi keamanan interaktif sebelum mengekspor seed phrase atau private key ke harddisk, dilengkapi derivasi otomatis kunci privat Bitcoin format WIF (*Wallet Import Format*).
 - **Proteksi Konkurensi Basis Data**: Konfigurasi `PRAGMA busy_timeout = 5000;` dan `PRAGMA journal_mode = WAL;` pada koneksi Rust (`rusqlite`) dan TypeScript (`@tauri-apps/plugin-sql`) untuk mencegah *database lock contention*.
 - **Native OS Clipboard Auto-Clear**: Timer native Windows level User32 yang menghapus clipboard secara otomatis setelah 30 detik, bahkan jika jendela aplikasi diminimalkan atau tidak fokus.
-- **Memori Aman (*Zeroize*)**: Buffer sensitif dan frasa kandidat di RAM dibersihkan (*securely zeroed*) secara otomatis saat sesi pemulihan dibatalkan (*cancelled*) atau diselesaikan.
+- **Strict Content Security Policy (CSP)**: Pagar pembatas webview ketat (`default-src 'self'`) yang memblokir 100% eksekusi skrip eksternal atau potensi serangan XSS di antarmuka desktop.
+- **Hardware-Level Memory Zeroize (`zeroize` Crate)**: Mengintegrasikan crate resmi `zeroize` dan memory fence `compiler_fence(Ordering::SeqCst)` untuk memastikan penimpaan fisik (*volatile zero overwrite*) pada kunci privat perantara, seed bytes, dan frasa pemulihan di RAM baik saat sesi dibatalkan (*cancelled*) maupun selesai (*completed*).
+- **Concurrency & Poisoning-Resistant Mutex**: Sistem gembok memori tangguh (`safe_lock`) dan *Atomic Generation Counter* untuk kontrol sesi Pause/Resume yang kebal terhadap race condition dan mencegah crash aplikasi.
 
 ### 4. 📊 Pemindai Saldo Multi-Chain & Realtime Valuation
 - **Pemindaian Saldo Paralel**: Multi-threaded Tokio RPC untuk jaringan EVM, Solana, dan Bitcoin.

@@ -743,3 +743,32 @@ Plurivex itu **proyek menengah dengan ambisi arsitektur yang lebih besar dari uk
 
 ---
 
+## 🚀 REVISI v4 — Implementasi Hardening Keamanan & Stabilitas (Tahap 1 Selesai)
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (33/33 Unit Test Lulus)**
+
+Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas tinggi (Tahap 1) telah selesai dikerjakan:
+
+1. **🔒 K4 — Strict Content Security Policy (CSP)**
+   - `tauri.conf.json` telah diperbarui dari `"csp": null` menjadi kebijakan ketat:
+     `"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420;"`
+   - Melindungi antarmuka webview dari serangan injeksi skrip eksternal (anti-XSS).
+
+2. **🎫 K6 — Race Condition Pause ➔ Resume Teratasi**
+   - Menambahkan pelacak generasi atomik `static SESSION_GENERATION: AtomicUsize` di `recovery_session.rs`.
+   - Tiket sesi dinaikkan secara atomik (`fetch_add`) pada setiap eksekusi start dan resume. Thread lama secara otomatis memeriksa tiket dan melakukan self-termination seketika jika tiket sudah usang. Menghilangkan bug *double worker* dan duplikasi hasil pencarian.
+
+3. **🧠 K7 — Integrasi Crate `zeroize` Sejati**
+   - Menambahkan crate resmi `zeroize = { version = "1.9", features = ["alloc"] }` ke `Cargo.toml`.
+   - `SecureBuffer` di `core/security/memory.rs` mengimplementasikan trait `Zeroize` dan `ZeroizeOnDrop`.
+   - Menambahkan `secure_zero_string()` dan fungsi pembersihan volatile memory barrier `compiler_fence(Ordering::SeqCst)`.
+   - Seluruh intermediate secret buffer (`seed_bytes`, `evm_pk_bytes`, `sol_seed_32`, `pk_bytes`) di `derivation.rs` kini dibersihkan dengan `.zeroize()` segera setelah derivasi selesai.
+   - Sesi pemulihan (`recovery_session.rs`) membersihkan `ACTIVE_RAW_PHRASE`, `ACTIVE_TARGET_ADDR`, dan `CACHED_SOLUTIONS` dengan penimpaan fisik nol (`0x00`) baik saat sesi di-cancel maupun saat selesai normal (*completed*).
+
+4. **🛡️ K8 — Resilient Poisoning-Resistant Mutex**
+   - Menambahkan fungsi helper `safe_lock<T>()` yang menangani `PoisonError` secara aman melalui `poisoned.into_inner()`.
+   - Seluruh 33 pemanggilan `.lock().unwrap()` pada `recovery_session.rs` telah digantikan dengan `safe_lock(&...)`, menjamin aplikasi tidak akan pernah crash akibat gembok memori yang teracuni.
+
+5. **🏷️ Rebranding Penuh ke Plurivex**
+   - Menyelaraskan seluruh nama crate biner & lib (`plurivex`, `plurivex_lib`), nama database default (`plurivex.db`), user-agent HTTP RPC client (`Plurivex/1.0`), dan dokumentasi arsitektur.
+
+
