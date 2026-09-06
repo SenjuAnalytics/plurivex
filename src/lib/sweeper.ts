@@ -444,7 +444,12 @@ export async function executeSweepSingle(
     const netAmount = balance.sub(fee);
 
     // Sign transaction offline natively in Rust (Zero-Disk & Zero-Webview key exposure)
-    const rawTx = await invoke<string>("sign_evm_transfer", {
+    interface EvmSignResult {
+      rawTx: string;
+      fromAddress: string;
+    }
+
+    const signResult = await invoke<EvmSignResult>("sign_evm_transfer", {
       secret,
       walletType,
       tx: {
@@ -456,6 +461,18 @@ export async function executeSweepSingle(
         nonce: acc.nonce,
       },
     });
+
+    // Self-check: verify that key-derived sender matches expected fromAddress
+    if (signResult.fromAddress.toLowerCase() !== fromAddress.toLowerCase()) {
+      return {
+        walletId,
+        address: fromAddress,
+        success: false,
+        error: `Sender address mismatch (expected ${fromAddress}, derived from key ${signResult.fromAddress})`,
+      };
+    }
+
+    const rawTx = signResult.rawTx;
 
     // Broadcast raw transaction via native Rust client (CORS-free)
     const txHash = await invoke<string>("broadcast_raw_tx", {

@@ -468,12 +468,20 @@ pub struct EvmTransferPayload {
     pub nonce: u64,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvmSignResult {
+    pub raw_tx: String,
+    pub from_address: String,
+}
+
 #[tauri::command]
 pub fn sign_evm_transfer(
     mut secret: String,
     wallet_type: String,
     tx: EvmTransferPayload,
-) -> Result<String, String> {
+) -> Result<EvmSignResult, String> {
+    let from_address = crate::core::wallets::signing::derive_evm_address_from_secret(&secret, &wallet_type)?;
     let params = crate::core::wallets::signing::EvmTransferParams {
         chain_id: tx.chain_id,
         to_address: &tx.to_address,
@@ -482,14 +490,17 @@ pub fn sign_evm_transfer(
         gas_limit: tx.gas_limit,
         nonce: tx.nonce,
     };
-    let res = crate::core::wallets::signing::sign_evm_transfer_with_secret(
+    let raw_tx = crate::core::wallets::signing::sign_evm_transfer_with_secret(
         &secret,
         &wallet_type,
         &params,
-    );
+    )?;
     // Auto-wipe secret string parameter from RAM immediately
     crate::core::security::memory::secure_zero_string(&mut secret);
-    res
+    Ok(EvmSignResult {
+        raw_tx,
+        from_address,
+    })
 }
 
 #[tauri::command]

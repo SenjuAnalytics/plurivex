@@ -111,8 +111,7 @@ pub fn parse_hex_or_dec_bytes(s: &str) -> Result<Vec<u8>, String> {
 /// The private key buffer is held in Zeroizing and wiped immediately.
 pub fn derive_evm_address_from_secret(secret: &str, wallet_type: &str) -> Result<String, String> {
     let pk = extract_evm_private_key(secret, wallet_type)?;
-    let (addr, _) = crate::core::wallets::derivation::evm_address_from_private_key(&pk)?;
-    Ok(addr)
+    crate::core::wallets::derivation::evm_address_only(&pk)
 }
 
 /// Helper to parse a 20-byte Ethereum address from a hex string

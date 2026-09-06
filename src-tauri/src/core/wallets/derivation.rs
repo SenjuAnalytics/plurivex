@@ -90,13 +90,19 @@ pub fn evm_address_from_public_key(pubkey_bytes: &[u8]) -> String {
     checksummed
 }
 
-/// Derive EVM address directly from a 32-byte private key
-pub fn evm_address_from_private_key(pk_bytes: &[u8; 32]) -> Result<(String, String), String> {
+/// Derive ONLY the checksummed EVM address directly from a 32-byte private key
+/// without allocating a hex private key string in heap memory.
+pub fn evm_address_only(pk_bytes: &[u8; 32]) -> Result<String, String> {
     let signing_key = SigningKey::from_bytes(pk_bytes.into())
         .map_err(|e| format!("Invalid secp256k1 key: {}", e))?;
     let verifying_key = signing_key.verifying_key();
     let uncompressed = verifying_key.to_encoded_point(false);
-    let address = evm_address_from_public_key(uncompressed.as_bytes());
+    Ok(evm_address_from_public_key(uncompressed.as_bytes()))
+}
+
+/// Derive EVM address directly from a 32-byte private key
+pub fn evm_address_from_private_key(pk_bytes: &[u8; 32]) -> Result<(String, String), String> {
+    let address = evm_address_only(pk_bytes)?;
     let private_key_hex = format!("0x{}", hex::encode(pk_bytes));
     Ok((address, private_key_hex))
 }
