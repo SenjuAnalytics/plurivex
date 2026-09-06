@@ -394,6 +394,17 @@ pub fn run_dual_word_session_worker(
                 base_indices
             };
 
+        let assemble_phrase = |indices: &[u16; 12]| -> String {
+            let mut phrase = String::with_capacity(120);
+            for (i, &idx) in indices.iter().enumerate() {
+                if i > 0 {
+                    phrase.push(' ');
+                }
+                phrase.push_str(word_list[idx as usize]);
+            }
+            phrase
+        };
+
         if missing_word_indices.len() == 1 {
             let p1 = missing_word_indices[0];
             let base_indices = extract_base_indices(&tokens, &missing_word_indices, word_list);
@@ -409,11 +420,7 @@ pub fn run_dual_word_session_worker(
                 test_indices[p1] = w1;
 
                 if fast_validate_12_words(&test_indices) {
-                    let phrase = test_indices
-                        .iter()
-                        .map(|&idx| word_list[idx as usize])
-                        .collect::<Vec<&str>>()
-                        .join(" ");
+                    let phrase = assemble_phrase(&test_indices);
 
                     {
                         let mut guard = safe_lock(&CACHED_SOLUTIONS);
@@ -465,11 +472,7 @@ pub fn run_dual_word_session_worker(
                         test_indices[p2] = w2;
 
                         if fast_validate_12_words(&test_indices) {
-                            let phrase = test_indices
-                                .iter()
-                                .map(|&idx| word_list[idx as usize])
-                                .collect::<Vec<&str>>()
-                                .join(" ");
+                            let phrase = assemble_phrase(&test_indices);
 
                             {
                                 let mut guard = safe_lock(&CACHED_SOLUTIONS);

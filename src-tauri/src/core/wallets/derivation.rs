@@ -557,4 +557,30 @@ mod tests {
         ));
         assert!(!is_valid_mnemonic_phrase("abandon abandon abandon invalid"));
     }
+
+    #[test]
+    fn test_bip49_and_bitcoin_derivation_vectors() {
+        // Canonical BIP-49 & Bitcoin test vectors for 12 words:
+        // "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let (native_segwit, nested_segwit, legacy) =
+            derive_bitcoin_addresses_only_native(mnemonic)
+                .expect("Bitcoin derivation should succeed");
+
+        // BIP-84 Native SegWit (bc1q...)
+        assert_eq!(
+            native_segwit.as_deref(),
+            Some("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu")
+        );
+        // BIP-49 Nested SegWit P2SH (3...) - Verified against official BIP-49 & Ian Coleman
+        assert_eq!(
+            nested_segwit.as_deref(),
+            Some("37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf")
+        );
+        // BIP-44 Legacy (1...)
+        assert_eq!(
+            legacy.as_deref(),
+            Some("1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA")
+        );
+    }
 }

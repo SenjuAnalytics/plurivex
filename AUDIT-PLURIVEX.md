@@ -774,7 +774,7 @@ Berdasarkan temuan audit teknis komprehensif, implementasi hardening prioritas t
 ---
 
 ## 🛡️ REVISI v5 — Production Hardening & Precision Forensic Lifecycle (Lengkap)
-*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (34/34 Unit Test Deterministik Lulus)**
+*Tanggal:* 2026-09-06 · *Status:* **Telah Diimplementasikan & Terverifikasi (35/35 Unit Test Deterministik Lulus)**
 
 Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 
@@ -814,6 +814,12 @@ Resolusi komprehensif terhadap review lanjutan commit `e66b59c` dan `5d71d54`:
 8. **🪙 N2 & Test Teardown — Dukungan Bitcoin BIP-49 (P2SH-P2WPKH) & Test Isolation**
    - Menambahkan implementasi derivasi alamat Bitcoin BIP-49 (`3...`) pada `derivation.rs` dan matcher `target_match.rs`, melengkapi dukungan ketiga format standar Bitcoin (Native SegWit `bc1q`, Nested SegWit `3`, dan Legacy `1`).
    - `test_in_memory_recovery_session_lifecycle` kini secara eksplisit memanggil `clear_recovery_session` di akhir eksekusi untuk menjamin kebersihan memori global backend antar-test.
+
+9. **🧪 T2 — Canonical Known-Answer Test Vector BIP-49 Resmi**
+   - Menambahkan unit test resmi `test_bip49_and_bitcoin_derivation_vectors` di `derivation.rs` yang memvalidasi ketiga format alamat Bitcoin (BIP-84 `bc1q...`, BIP-49 `3...`, BIP-44 `1...`) terhadap test vector resmi BIP-49 & Ian Coleman (`abandon ... about` $\rightarrow$ `37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf`). Mengunci kebenaran kriptografis dan mencegah regresi diam-diam.
+
+10. **⚡ Z3 — Zero-Heap Overhead Phrase Assembly di Worker Loop**
+    - Mengganti alokasi `.collect::<Vec<&str>>().join(" ")` di worker recovery loop (`recovery_session.rs`) dengan closure buffer pra-alokasi `assemble_phrase(&indices)` (`String::with_capacity(120)`). Mengeliminasi pembuatan intermediate pointer vector di heap secara berulang.
 
 
 
